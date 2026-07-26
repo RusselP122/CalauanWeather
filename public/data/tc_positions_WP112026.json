@@ -3,13 +3,13 @@
   "storm_name": "TC 11W",
   "track_id": "WP112026",
   "latest": {
-    "lat": 22.9,
-    "lon": 114.5,
+    "lat": 23.9,
+    "lon": 114.2,
     "pressure_hpa": 976.0,
-    "wind_kt": 74.0,
-    "wind_kmh": 137,
-    "movement": "NW at 13.8 km/h (7.5 kt)",
-    "init_time": "2026-07-26 00:00",
+    "wind_kt": 64.0,
+    "wind_kmh": 119,
+    "movement": "NNW at 19.2 km/h (10.4 kt)",
+    "init_time": "2026-07-26 06:00",
     "category": "Typhoon"
   },
   "history": [
@@ -146,6 +146,15 @@
       "pressure_hpa": 976.0,
       "wind_kt": 74.0,
       "wind_kmh": 137,
+      "category": "Typhoon"
+    },
+    {
+      "cycle": "2026-07-26 06:00",
+      "lat": 23.9,
+      "lon": 114.2,
+      "pressure_hpa": 976.0,
+      "wind_kt": 64.0,
+      "wind_kmh": 119,
       "category": "Typhoon"
     }
   ]
