@@ -2,7 +2,7 @@
   {
     "track_id": "WP112026",
     "storm_name": "TC 11W",
-    "active": true,
+    "active": false,
     "last_updated": "2026-07-26 06:00",
     "latest_lat": 23.9,
     "latest_lon": 114.2,
