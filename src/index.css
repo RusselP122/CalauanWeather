@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+:root {
+  --bg-dark: #050b14;
+  --bg-panel: rgba(13, 24, 42, 0.6);
+  --bg-panel-solid: #0d182a;
+  --bg-elevated: rgba(26, 43, 76, 0.6);
+  --border-color: rgba(65, 96, 152, 0.2);
+  --border-highlight: rgba(0, 212, 255, 0.4);
+  
+  --text-main: #f0f4f8;
+  --text-muted: #94a3b8;
+  --text-accent: #00d4ff;
+  
+  --accent-color: #00d4ff;
+  --accent-hover: #00e5ff;
+  --accent-glow: rgba(0, 212, 255, 0.2);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-dark);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(0, 212, 255, 0.05), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(13, 37, 73, 0.5), transparent 25%);
+  color: var(--text-main);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  text-decoration: none;
+}

@@ -1,0 +1,67 @@
+name: Update ECMWF AIFS TC Tracks
+on:
+  schedule:
+    - cron: '45 2,8,14,20 * * *' # Run 4 times a day, slightly offset from IFS
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          
+      - name: Install system dependencies (eccodes and proj)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes-dev libgeos-dev libproj-dev proj-data proj-bin
+          
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas ecmwf-opendata eccodes numpy matplotlib cartopy
+          
+      - name: Download and Process AIFS Tracks
+        run: |
+          python tc_aifs_tracks.py
+          
+      - name: Generate static map images
+        run: |
+          python plot_aifs_tracks.py
+
+      - name: Obfuscate CSV Files
+        run: python obfuscate_data.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Stage files first so they are not untracked
+          git add -f public/data/aifs_tc_latest.enc || true
+          git add public/assets/aifs_tropical_cyclone_* || true
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto-update ECMWF AIFS TC Tracks and Images [skip ci]"
+          fi
+          
+          git stash --include-untracked || true
+          git pull --rebase -X theirs origin main || {
+            echo "Rebase conflict detected, auto-resolving..."
+            git add -A
+            GIT_EDITOR=true git rebase --continue || git rebase --skip
+          }
+          git stash pop || true
+          git push

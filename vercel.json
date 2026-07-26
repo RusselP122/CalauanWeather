@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/generate-map",
+      "destination": "https://calauanweather.onrender.com/api/generate-map"
+    },
+    {
+      "source": "/((?!data/|api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "outputDirectory": "dist"
+}

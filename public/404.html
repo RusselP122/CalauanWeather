@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>404 · Calauan Weather</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0a0f1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      animation: gridDrift 20s linear infinite;
+    }
+    @keyframes gridDrift {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(60px, 60px); }
+    }
+    /* Glow orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.15;
+      animation: float 8s ease-in-out infinite;
+    }
+    .orb-1 { width: 400px; height: 400px; background: #00d4ff; top: -100px; left: -100px; }
+    .orb-2 { width: 300px; height: 300px; background: #4f46e5; bottom: -80px; right: -80px; animation-delay: -4s; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-30px) scale(1.05); }
+    }
+    .container {
+      text-align: center;
+      position: relative;
+      z-index: 10;
+      max-width: 480px;
+      padding: 3rem 2rem;
+    }
+    /* Glitch 404 */
+    .error-code {
+      font-size: 8rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      background: linear-gradient(135deg, #00d4ff 0%, #4facfe 40%, #a855f7 100%);
+      -webkit-background-clip: text;
+      color: transparent;
+      position: relative;
+      margin-bottom: 1rem;
+      animation: glitch 3s ease-in-out infinite;
+    }
+    @keyframes glitch {
+      0%, 90%, 100% { text-shadow: none; filter: none; }
+      92% { text-shadow: 3px 0 #00d4ff, -3px 0 #a855f7; filter: blur(0.5px); }
+      94% { text-shadow: -2px 0 #00d4ff, 2px 0 #a855f7; }
+      96% { text-shadow: none; filter: none; }
+    }
+    .shield-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1.5rem;
+      color: #f59e0b;
+      filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.4));
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.95); }
+    }
+    .title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+      color: #f1f5f9;
+    }
+    .message {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+    .message strong { color: #f59e0b; font-weight: 600; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.75rem;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: white;
+      background: linear-gradient(135deg, rgba(0,212,255,0.8), rgba(0,150,255,0.8));
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 20px rgba(0,212,255,0.2);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(0,212,255,0.35);
+      border-color: rgba(0,212,255,0.6);
+    }
+    .footer {
+      margin-top: 3rem;
+      font-size: 0.6875rem;
+      color: #475569;
+      letter-spacing: 0.05em;
+    }
+    .footer strong { color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="container">
+    <div class="error-code">404</div>
+    <svg class="shield-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+        d="M12 15v.01M12 12v-2m0-4.938a49.39 49.39 0 00-6.588.66C4.358 5.9 3.727 6.137 3.142 6.48A1.962 1.962 0 002 8.2v2.647c0 4.327 2.47 8.285 6.347 10.244l1.302.67a2 2 0 001.702 0l1.302-.67C16.53 19.132 19 15.174 19 10.847V8.2a1.962 1.962 0 00-1.142-1.72 13.862 13.862 0 00-2.858-.938A49.39 49.39 0 0012 5.062z" />
+    </svg>
+    <h1 class="title">Resource Not Found</h1>
+    <p class="message">
+      The requested data or page could not be located on the server.<br />
+      It may be temporarily unavailable or awaiting the next forecast cycle.
+    </p>
+    <a href="/" class="btn">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+      Go to Dashboard
+    </a>
+    <p class="footer">Powered by <strong>Calauan Weather</strong></p>
+  </div>
+</body>
+</html>
