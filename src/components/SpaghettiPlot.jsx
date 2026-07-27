@@ -1286,17 +1286,17 @@ export default function SpaghettiPlot() {
             // PAR boundary (solid red)
             parLayerRef.current = L.polyline(PAR, { color: "#ef4444", weight: 2 }).addTo(map);
 
-            // Country boundaries (matches Python BORDERS styling)
-            fetch(getAssetUrl("/assets/country.0.1_small.json"))
+            // Country boundaries GeoJSON Overlay
+            fetch("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
                 .then(r => r.ok ? r.json() : null)
                 .then(geo => {
                     if (geo && map) {
                         geoJsonLayerRef.current = L.geoJSON(geo, {
-                            style: { color: "#facc15", weight: 1, opacity: 0.7, fillOpacity: 0 }
+                            style: { color: "rgba(255, 255, 255, 0.3)", weight: 1, opacity: 0.7, fillOpacity: 0.02 }
                         }).addTo(map);
                     }
                 })
-                .catch(() => { /* silently skip if unavailable */ });
+                .catch(err => { console.warn("Failed to load countries GeoJSON:", err); });
 
             gridlinesLayerRef.current = L.layerGroup().addTo(map);
 
@@ -3438,57 +3438,19 @@ export default function SpaghettiPlot() {
                 )}
 
                 {/* Mobile top bar */}
-                <div
-                    className="mobile-topbar"
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        width: "100%",
-                        minHeight: "48px",
-                        boxSizing: "border-box",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                        padding: "0.5rem 0.75rem",
-                        background: "rgba(13, 24, 42, 0.95)",
-                        backdropFilter: "blur(10px)",
-                        WebkitBackdropFilter: "blur(10px)",
-                        borderBottom: "2px solid #00d4ff",
-                        zIndex: 1001
-                    }}
-                >
+                <div className="mobile-topbar">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="mobile-menu-btn"
-                        style={{
-                            padding: "0.5rem",
-                            borderRadius: "8px",
-                            backgroundColor: "rgba(30, 41, 59, 0.8)",
-                            color: "#f8fafc",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center"
-                        }}
+                        title="Open Control Panel"
                     >
-                        <svg className="spaghetti-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: "14px", height: "14px" }}>
+                        <svg className="spaghetti-section-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: "16px", height: "16px" }}>
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
+                        <span>Controls</span>
                     </button>
-                    <span
-                        className="mobile-title"
-                        style={{
-                            fontSize: "0.75rem",
-                            fontWeight: "600",
-                            color: "#f8fafc",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis"
-                        }}
-                    >
-                        {dataset === "ifs" ? "ECMWF IFS" : dataset === "aifs" ? "ECMWF AIFS" : dataset === "aigefs" ? "NOAA AI-GEFS" : dataset === "large" ? "GDM FNV3 Large" : dataset === "fnv3p2" ? "GDM FNV3 Base" : dataset === "fnv3p1" ? "GDM FNV3P1" : dataset === "oper" ? "GDM OPER" : "GDM FNV3"} · {horizon === "5day" ? "5-Day" : "15-Day"} Spaghetti
+                    <span className="mobile-title">
+                        {dataset === "ifs" ? "ECMWF IFS" : dataset === "aifs" ? "ECMWF AIFS" : dataset === "aigefs" ? "NOAA AI-GEFS" : dataset === "large" ? "GDM FNV3 Large" : dataset === "fnv3p2" ? "GDM FNV3 Base" : dataset === "fnv3p1" ? "GDM FNV3P1" : dataset === "oper" ? "GDM OPER" : "GDM FNV3"} · {horizon === "5day" ? "5-Day" : "15-Day"}
                     </span>
                 </div>
 

@@ -1,7 +1,7 @@
 // src/components/Forecast.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import NewsNotification from "./NewsNotification";
+import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import Navbar from "./Navbar";
 import "./Forecast.css";
 
@@ -26,7 +26,7 @@ const mmY = String(yesterday.getMonth() + 1).padStart(2, "0");
 const ddY = String(yesterday.getDate()).padStart(2, "0");
 const yesterdayDateStr = `${yyyyY}-${mmY}-${ddY}`; // e.g. 2026-05-24
 
-// Parse model time in UTC and shift by 16 hours (custom publication offset)
+// Parse model time in UTC and convert to Philippine Standard Time (UTC + 8 hours)
 const getAdjustedPHSTDate = (modelTime) => {
   const parts = modelTime.split("T");
   const datePart = parts[0];
@@ -41,10 +41,10 @@ const getAdjustedPHSTDate = (modelTime) => {
   const sec = parseInt(timePart.slice(4, 6), 10);
 
   const utcTime = Date.UTC(yr, mo, dy, hr, min, sec);
-  return new Date(utcTime + 16 * 60 * 60 * 1000);
+  return new Date(utcTime + 8 * 60 * 60 * 1000);
 };
 
-// Convert a model time string to a 12-hour PHST label (adjusted +16h)
+// Convert a model time string to a 12-hour PHST label (UTC + 8h)
 const toPhstLabel = (modelTime) => {
   const date = getAdjustedPHSTDate(modelTime);
   const hours24 = date.getUTCHours();
@@ -54,7 +54,7 @@ const toPhstLabel = (modelTime) => {
   return `${hours12}:${String(date.getUTCMinutes()).padStart(2, "0")} ${period}`;
 };
 
-// Pretty Date Converter with proper date rollover (adjusted +16h)
+// Pretty Date Converter with proper date rollover (UTC + 8h)
 const toPrettyDate = (modelTime) => {
   const date = getAdjustedPHSTDate(modelTime);
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -303,14 +303,17 @@ const Forecast = () => {
   useEffect(() => {
     fetch(getAssetUrl("/data/tc_storms_index.json"))
       .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error("Failed to load storms index");
+        const contentType = res.headers.get("content-type");
+        if (res.ok && contentType && contentType.includes("application/json")) {
+          return res.json();
+        }
+        return [];
       })
       .then((json) => {
         setStormsIndex((json || []).filter((s) => s.active));
       })
-      .catch((err) => {
-        console.error("Error loading storms index in Forecast:", err);
+      .catch(() => {
+        setStormsIndex([]);
       });
   }, []);
 
@@ -321,12 +324,14 @@ const Forecast = () => {
 
   // Zoom & Pan Lightbox States
   const [lightboxData, setLightboxData] = useState(null); // { src, title }
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [touchStartDist, setTouchStartDist] = useState(0);
+  const touchSwipeStartRef = useRef(null);
 
   const canvasRef = useRef(null);
   const latestKnownRef = useRef(null);
@@ -484,6 +489,97 @@ const Forecast = () => {
     };
   };
 
+  // Compute available models with loaded images in Grid Comparison mode
+  const availableGridItems = useMemo(() => {
+    return modelsList
+      .map((model) => {
+        const track = getModelTrackData(model.id);
+        return { model, track };
+      })
+      .filter((item) => item.track && item.track.imageSrc);
+  }, [modelsList, selectedType, selectedModelTime, selectedStormId, availableIds, showForecastTrack, showClusters]);
+
+  const handlePrevLightbox = (e) => {
+    if (e) e.stopPropagation();
+    if (availableGridItems.length > 0 && lightboxIndex !== null) {
+      const prevIdx = (lightboxIndex - 1 + availableGridItems.length) % availableGridItems.length;
+      const prevItem = availableGridItems[prevIdx];
+      setLightboxIndex(prevIdx);
+      setLightboxData({
+        src: prevItem.track.imageSrc,
+        title: `${prevItem.model.name} (${selectedType.toUpperCase()})`
+      });
+      setZoomScale(1);
+      setPanX(0);
+      setPanY(0);
+    }
+  };
+
+  const handleNextLightbox = (e) => {
+    if (e) e.stopPropagation();
+    if (availableGridItems.length > 0 && lightboxIndex !== null) {
+      const nextIdx = (lightboxIndex + 1) % availableGridItems.length;
+      const nextItem = availableGridItems[nextIdx];
+      setLightboxIndex(nextIdx);
+      setLightboxData({
+        src: nextItem.track.imageSrc,
+        title: `${nextItem.model.name} (${selectedType.toUpperCase()})`
+      });
+      setZoomScale(1);
+      setPanX(0);
+      setPanY(0);
+    }
+  };
+
+  const openLightboxWithImage = (src, title, modelId) => {
+    let idx = -1;
+    if (modelId) {
+      idx = availableGridItems.findIndex((item) => item.model.id === modelId);
+    }
+    if (idx === -1) {
+      idx = availableGridItems.findIndex((item) => item.track && item.track.imageSrc === src);
+    }
+    setLightboxIndex(idx !== -1 ? idx : 0);
+    setLightboxData({ src, title });
+    setZoomScale(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
+  // Touch Swipe navigation handlers for Lightbox modal
+  const handleLightboxTouchStart = (e) => {
+    if (e.touches && e.touches.length === 1) {
+      touchSwipeStartRef.current = e.touches[0].clientX;
+    }
+  };
+
+  const handleLightboxTouchEnd = (e) => {
+    if (touchSwipeStartRef.current !== null && e.changedTouches && e.changedTouches.length === 1) {
+      const touchEndClientX = e.changedTouches[0].clientX;
+      const swipeDelta = touchEndClientX - touchSwipeStartRef.current;
+      touchSwipeStartRef.current = null;
+
+      if (swipeDelta < -45) {
+        handleNextLightbox();
+      } else if (swipeDelta > 45) {
+        handlePrevLightbox();
+      }
+    }
+  };
+
+  // Keyboard navigation listener (ArrowLeft / ArrowRight / Escape)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (lightboxData) {
+        if (e.key === "ArrowLeft") handlePrevLightbox();
+        if (e.key === "ArrowRight") handleNextLightbox();
+        if (e.key === "Escape") closeLightbox();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxData, lightboxIndex, availableGridItems]);
+
   const hasDataForCycle = (cycleTime) => {
     if (isCompareGrid) {
       return FORECAST_OPTIONS.some((opt) => opt.modelTime === cycleTime && availableIds.includes(opt.id));
@@ -502,6 +598,7 @@ const Forecast = () => {
   // Close Lightbox Canvas
   const closeLightbox = () => {
     setLightboxData(null);
+    setLightboxIndex(null);
     setZoomScale(1);
     setPanX(0);
     setPanY(0);
@@ -530,13 +627,14 @@ const Forecast = () => {
     setIsDragging(false);
   };
 
-  // Touch support for dragging + pinch zoom
+  // Touch support for dragging + pinch zoom + swipe navigation
   const handleTouchStart = (e) => {
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       setTouchStartDist(Math.hypot(dx, dy));
     } else if (e.touches.length === 1) {
+      touchSwipeStartRef.current = e.touches[0].clientX;
       handleDragStart(e);
     }
   };
@@ -568,6 +666,18 @@ const Forecast = () => {
       setTouchStartDist(0);
     }
     handleDragEnd();
+
+    if (zoomScale === 1 && touchSwipeStartRef.current !== null && e.changedTouches && e.changedTouches.length === 1) {
+      const touchEndClientX = e.changedTouches[0].clientX;
+      const swipeDelta = touchEndClientX - touchSwipeStartRef.current;
+      touchSwipeStartRef.current = null;
+
+      if (swipeDelta < -40) {
+        handleNextLightbox();
+      } else if (swipeDelta > 40) {
+        handlePrevLightbox();
+      }
+    }
   };
 
   const handleZoomIn = () => {
@@ -609,8 +719,6 @@ const Forecast = () => {
             </div>
 
             <div className="header-controls">
-              <NewsNotification />
-
               <div className="header-row">
                 <Link to="/spaghetti" className="btn-interactive">
                   <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -850,7 +958,7 @@ const Forecast = () => {
                       {track && track.imageSrc ? (
                         <div
                           className="compare-image-wrapper"
-                          onClick={() => setLightboxData({ src: track.imageSrc, title: `${model.name} (${selectedType.toUpperCase()})` })}
+                          onClick={() => openLightboxWithImage(track.imageSrc, `${model.name} (${selectedType.toUpperCase()})`, model.id)}
                         >
                           <img
                             src={track.imageSrc}
@@ -1021,7 +1129,7 @@ const Forecast = () => {
                       <img
                         src={currentTrack.imageSrc}
                         alt={`Forecast track for ${currentTrack.name}`}
-                        onClick={() => setLightboxData({ src: currentTrack.imageSrc, title: `${currentTrack.name} (${selectedType.toUpperCase()})` })}
+                        onClick={() => openLightboxWithImage(currentTrack.imageSrc, `${currentTrack.name} (${selectedType.toUpperCase()})`, selectedModel)}
                         className="forecast-img"
                       />
                     ) : (
@@ -1187,18 +1295,66 @@ const Forecast = () => {
           </div>
         </div>
 
-        {/* Lightbox Zoom/Pan overlay */}
+        {/* Lightbox Zoom/Pan Overlay */}
         {lightboxData && (
-          <div className="lightbox-overlay" onClick={closeLightbox}>
-            <button
-              onClick={closeLightbox}
-              className="lightbox-close"
-              aria-label="Close modal"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
+          <div
+            className="lightbox-overlay"
+            onClick={closeLightbox}
+            onTouchStart={handleLightboxTouchStart}
+            onTouchEnd={handleLightboxTouchEnd}
+          >
+            {/* Top Navigation Bar: Brand Pill on Left, Model Switcher in Center, Zoom & Close on Right */}
+            <div className="lightbox-top-bar" onClick={(e) => e.stopPropagation()}>
+              <div className="lightbox-brand-group">
+                <span className="lightbox-brand-title">
+                  {lightboxIndex !== null && availableGridItems[lightboxIndex]
+                    ? availableGridItems[lightboxIndex].model.name.toUpperCase()
+                    : lightboxData.title}
+                </span>
+                <span className="lightbox-brand-badge">MAINLINE</span>
+              </div>
 
-            {/* Interactive Zoom/Pan canvas */}
+              {availableGridItems.length > 1 && (
+                <div className="lightbox-model-tabs-center">
+                  {availableGridItems.map((item, idx) => (
+                    <button
+                      key={item.model.id}
+                      className={`lightbox-tab-pill ${idx === lightboxIndex ? "active" : ""}`}
+                      onClick={() => {
+                        setLightboxIndex(idx);
+                        setLightboxData({
+                          src: item.track.imageSrc,
+                          title: `${item.model.name} (${selectedType.toUpperCase()})`
+                        });
+                        setZoomScale(1);
+                        setPanX(0);
+                        setPanY(0);
+                      }}
+                    >
+                      {item.model.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="lightbox-top-actions">
+                <span className="zoom-value-text">Zoom: {zoomScale.toFixed(1)}x</span>
+                <button className="top-action-btn" onClick={handleZoomIn} title="Zoom In">
+                  <ZoomIn size={15} />
+                </button>
+                <button className="top-action-btn" onClick={handleZoomOut} title="Zoom Out">
+                  <ZoomOut size={15} />
+                </button>
+                <button className="top-action-btn" onClick={handleResetZoom} title="Reset View">
+                  <RotateCcw size={15} />
+                </button>
+                <button className="top-action-btn close-danger-btn" onClick={closeLightbox} title="Close Modal">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive Zoom/Pan Canvas */}
             <div
               ref={canvasRef}
               className={`lightbox-canvas ${isDragging ? "dragging" : ""}`}
@@ -1222,15 +1378,40 @@ const Forecast = () => {
               />
             </div>
 
-            {/* Canvas Controller badging and reset hooks */}
-            <div className="lightbox-controls" onClick={(e) => e.stopPropagation()}>
-              <button className="lightbox-btn" onClick={handleZoomOut}>Zoom Out</button>
-              <span className="lightbox-zoom-indicator">{zoomScale.toFixed(1)}x</span>
-              <button className="lightbox-btn" onClick={handleZoomIn}>Zoom In</button>
-              {zoomScale > 1 && (
-                <button className="lightbox-btn" onClick={handleResetZoom} style={{ color: "var(--accent-color)" }}>Reset</button>
-              )}
-            </div>
+            {/* Bottom Stepper Pill Bar: < Prev • Dots • Next > */}
+            {availableGridItems.length > 1 && (
+              <div className="lightbox-bottom-stepper" onClick={(e) => e.stopPropagation()}>
+                <button className="stepper-btn" onClick={handlePrevLightbox}>
+                  <ChevronLeft size={15} />
+                  <span>Prev</span>
+                </button>
+
+                <div className="stepper-dots">
+                  {availableGridItems.map((_, idx) => (
+                    <span
+                      key={idx}
+                      className={`stepper-dot ${idx === lightboxIndex ? "active" : ""}`}
+                      onClick={() => {
+                        const item = availableGridItems[idx];
+                        setLightboxIndex(idx);
+                        setLightboxData({
+                          src: item.track.imageSrc,
+                          title: `${item.model.name} (${selectedType.toUpperCase()})`
+                        });
+                        setZoomScale(1);
+                        setPanX(0);
+                        setPanY(0);
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <button className="stepper-btn" onClick={handleNextLightbox}>
+                  <span>Next</span>
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>
