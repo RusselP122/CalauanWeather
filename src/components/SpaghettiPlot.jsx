@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import GIF from "gif.js";
 import gifWorkerUrl from "gif.js/dist/gif.worker.js?url";
 import EnsembleFilter from "./EnsembleFilter";
+import Navbar from "./Navbar";
 import {
     ResponsiveContainer,
     LineChart,
@@ -3405,7 +3406,9 @@ export default function SpaghettiPlot() {
     );
 
     return (
-        <div className="spaghetti-layout">
+        <>
+            <Navbar />
+            <div className="spaghetti-layout">
             {/* Mobile overlay */}
             <div className={`mobile-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
@@ -4069,5 +4072,6 @@ export default function SpaghettiPlot() {
                 </div>
             )}
         </div>
+        </>
     );
 }

@@ -1,0 +1,804 @@
+/* ==========================================================================
+   Calauan Weather Portal - Home Page Design System & Responsive Stylesheet
+   ========================================================================== */
+
+.homepage-wrapper {
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  overflow-x: hidden; /* Prevent horizontal body scrolling on small screens */
+}
+
+.dashboard-main-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ==========================================================================
+   1. Dashboard Top Header Bar
+   ========================================================================== */
+.dashboard-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(13, 24, 42, 0.6);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 1rem;
+  padding: 0.85rem 1.25rem;
+  backdrop-filter: blur(12px);
+}
+
+.top-bar-location {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.top-bar-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(0, 212, 255, 0.12);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.top-bar-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.top-bar-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.top-bar-pill {
+  background: rgba(0, 212, 255, 0.1);
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sync-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(0, 212, 255, 0.12);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  color: #38bdf8;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.sync-btn:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.25);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
+  color: #ffffff;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   2. Current Weather & Map Layout Grid
+   ========================================================================== */
+.current-weather-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.current-weather-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.card-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.location-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.live-status-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.hero-weather-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0 1.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.temperature-group {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.temp-value {
+  font-size: 4.5rem;
+  font-weight: 900;
+  line-height: 0.88;
+  color: #ffffff;
+  letter-spacing: -2px;
+}
+
+.temp-unit {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--accent-color);
+  margin-top: 4px;
+}
+
+.feels-like-tag {
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.condition-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  text-align: right;
+}
+
+.weather-hero-icon {
+  filter: drop-shadow(0 0 18px rgba(0, 212, 255, 0.35));
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.condition-label {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+/* Day Summary Row (High/Low Temp & Sun Times) */
+.day-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: rgba(8, 15, 29, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  flex-wrap: wrap;
+}
+
+.summary-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.summary-badge .badge-icon {
+  color: var(--accent-color);
+}
+
+.sun-times-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.sun-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+/* Key Metrics Tiles */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.metric-tile {
+  background: rgba(8, 15, 29, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 212, 255, 0.35);
+  background: rgba(13, 24, 42, 0.85);
+}
+
+.metric-icon {
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.metric-data {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.metric-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metric-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   3. Agricultural Advisory Banner
+   ========================================================================== */
+.agricultural-advisory-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: rgba(13, 24, 42, 0.8);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 1rem;
+  padding: 1rem 1.35rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.advisory-icon-wrapper {
+  padding: 0.5rem;
+  background: rgba(234, 179, 8, 0.15);
+  border-radius: 0.65rem;
+  color: #eab308;
+  flex-shrink: 0;
+}
+
+.advisory-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #fef08a;
+}
+
+.advisory-text {
+  font-size: 0.84rem;
+  color: #cbd5e1;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+/* ==========================================================================
+   4. 7-Day ECMWF IFS Forecast Section
+   ========================================================================== */
+.forecast-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.section-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.section-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.forecast-days-pill {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--accent-color);
+  background: rgba(0, 212, 255, 0.1);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  white-space: nowrap;
+}
+
+.forecast-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.75rem;
+}
+
+.forecast-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.forecast-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(13, 24, 42, 0.95);
+}
+
+.forecast-card.selected {
+  border-color: var(--accent-color);
+  background: rgba(0, 212, 255, 0.14);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+}
+
+.card-day-header {
+  display: flex;
+  flex-direction: column;
+}
+
+.day-name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.day-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.card-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+}
+
+.card-condition-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.card-temp-range {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.temp-high {
+  color: #ffffff;
+}
+
+.temp-low {
+  color: var(--text-muted);
+}
+
+.temp-bar-bg {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  position: relative;
+}
+
+.temp-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #38bdf8, #f59e0b);
+  border-radius: 2px;
+}
+
+.card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+/* ==========================================================================
+   5. Interactive Visual Analytics Section (Recharts)
+   ========================================================================== */
+.analytics-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  backdrop-filter: blur(12px);
+}
+
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.analytics-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.analytics-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.chart-tab-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(8, 15, 29, 0.8);
+  padding: 0.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.chart-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chart-tab:hover {
+  color: #f8fafc;
+}
+
+.chart-tab.active {
+  color: var(--accent-color);
+  background: rgba(0, 212, 255, 0.15);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
+}
+
+.chart-canvas-wrapper {
+  width: 100%;
+  padding-top: 0.5rem;
+}
+
+/* ==========================================================================
+   6. 24-Hour Hourly Timeline Slider
+   ========================================================================== */
+.timeline-slider-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.slider-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.timeline-track-container {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding: 0.5rem 0.25rem 1rem 0.25rem;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.timeline-track-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline-track-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.3);
+  border-radius: 3px;
+}
+
+.timeline-hour-card {
+  min-width: 85px;
+  background: var(--bg-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.85rem;
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.timeline-hour-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 212, 255, 0.3);
+}
+
+.hour-time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.hour-temp {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.hour-rain {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Responsive Breakpoints & Media Queries (Desktop, Tablet & Mobile)
+   ========================================================================== */
+
+/* Laptops & Medium Screens (1024px to 1280px) */
+@media (max-width: 1280px) {
+  .forecast-cards-grid {
+    grid-template-columns: repeat(7, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .current-weather-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-cards-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Tablets (768px to 1023px) */
+@media (max-width: 900px) {
+  .dashboard-main-container {
+    padding: 1rem;
+    gap: 1.25rem;
+  }
+
+  .dashboard-top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .top-bar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .forecast-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Mobile Screens (Small Viewports < 640px) */
+@media (max-width: 640px) {
+  .dashboard-main-container {
+    padding: 0.85rem;
+    gap: 1rem;
+  }
+
+  .current-weather-card {
+    padding: 1.15rem;
+  }
+
+  .hero-weather-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .condition-visual {
+    align-items: flex-start;
+    text-align: left;
+    margin-top: 0.25rem;
+  }
+
+  .temp-value {
+    font-size: 3.75rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+
+  .metric-tile {
+    padding: 0.75rem 0.6rem;
+  }
+
+  .metric-value {
+    font-size: 0.85rem;
+  }
+
+  .metric-label {
+    font-size: 0.62rem;
+  }
+
+  /* 7-Day Forecast Grid on Mobile becomes horizontal touch card slider */
+  .forecast-cards-grid {
+    display: flex;
+    gap: 0.65rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .forecast-card {
+    min-width: 125px;
+    flex-shrink: 0;
+  }
+
+  .analytics-section {
+    padding: 1.15rem;
+  }
+
+  .analytics-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart-tab-group {
+    width: 100%;
+  }
+
+  .agricultural-advisory-banner {
+    flex-direction: column;
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .temp-value {
+    font-size: 3.25rem;
+  }
+}

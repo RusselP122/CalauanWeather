@@ -18,6 +18,12 @@ const X = ({ size }) => (
 
 const CHANGELOG = [
   {
+    id: 11,
+    date: 'July 27, 2026',
+    title: 'Calauan Weather V1.5 - Official CLUP Barangay Map & ECMWF IFS 0.25° Portal',
+    description: 'Welcome to Calauan Weather V1.5! This major update brings a dedicated meteorological dashboard for Calauan, Laguna powered by live ECMWF IFS 0.25° data. Features include: (1) Official Municipal CLUP Boundary Vector Map covering all 18 official barangays & sectors (Limao, Perez, Mabacan, Paliparan, Balayhangin, Imok, Prinza, Masiit, Hanggan, Bangyas, San Isidro, Kanluran, Silangan, Lamot 1, Lamot 2, Dayap, Santo Tomas) with live rainfall and wind overlay badges; (2) Multi-touch Map Zoom (+/-), Reset (↺), and Drag-Panning; (3) 7-day forecast grid, 24h hourly timeline slider, and agricultural advisory; (4) Dynamic local PHST clock & mobile responsive UI overhaul.'
+  },
+  {
     id: 10,
     date: 'June 11, 2026',
     title: 'Run-to-Run Forecast Trends',
@@ -118,7 +124,7 @@ export default function NewsNotification() {
         <div className="news-overlay" onClick={() => setIsOpen(false)}>
           <div className="news-modal" onClick={e => e.stopPropagation()}>
             <div className="news-header">
-              <h2>What's New in Calauan Weather V1.4</h2>
+              <h2>What's New in Calauan Weather V1.5</h2>
               <button className="news-close-btn" onClick={() => setIsOpen(false)}>
                 <X size={24} />
               </button>

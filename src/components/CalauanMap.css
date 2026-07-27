@@ -1,0 +1,337 @@
+.calauan-map-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.map-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.header-icon {
+  color: var(--accent-color);
+}
+
+.map-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.map-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Map Overlay Switcher Tabs */
+.map-overlay-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(8, 15, 29, 0.8);
+  padding: 0.25rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.15);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
+}
+
+.map-viewport-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  background: radial-gradient(circle at center, #0e223d 0%, #060f1f 100%);
+  border-radius: 0.85rem;
+  border: 1px solid rgba(65, 96, 152, 0.35);
+  overflow: hidden;
+  user-select: none;
+}
+
+.svg-map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Floating Zoom Control Panel */
+.zoom-controls {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(8, 15, 29, 0.85);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  padding: 0.3rem;
+  border-radius: 0.65rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #38bdf8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zoom-btn:hover {
+  background: rgba(0, 212, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(0, 212, 255, 0.4);
+}
+
+.zoom-btn.reset {
+  color: #f59e0b;
+}
+
+.zoom-btn.reset:hover {
+  background: rgba(245, 158, 11, 0.2);
+  color: #ffffff;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.zoom-scale-indicator {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #94a3b8;
+  font-family: var(--font-mono);
+  padding: 0 0.35rem;
+}
+
+.calauan-svg-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Official Barangay Polygons matching CLUP Map */
+.barangay-official-polygon {
+  fill: rgba(30, 58, 105, 0.65);
+  stroke: rgba(0, 212, 255, 0.6);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.barangay-official-polygon:hover {
+  fill: rgba(56, 189, 248, 0.35);
+  stroke: #00d4ff;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.7));
+}
+
+.barangay-official-polygon.active {
+  fill: rgba(2, 132, 199, 0.5);
+  stroke: #38bdf8;
+  stroke-width: 2.8;
+  filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.8));
+}
+
+/* Barangay Labels inside Map */
+.barangay-map-label {
+  font-size: 10px;
+  font-weight: 700;
+  fill: #e2e8f0;
+  text-anchor: middle;
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.8);
+  transition: all 0.2s ease;
+}
+
+.barangay-map-label.active {
+  fill: #00d4ff;
+  font-weight: 900;
+  font-size: 11px;
+}
+
+/* Barangay Map Nodes */
+.barangay-node-group {
+  cursor: pointer;
+}
+
+.barangay-node-group rect {
+  transition: all 0.2s ease;
+}
+
+.barangay-node-group:hover rect {
+  filter: drop-shadow(0 0 8px #00d4ff);
+  stroke-width: 1.8;
+}
+
+.barangay-node-group:hover circle {
+  filter: drop-shadow(0 0 8px #00d4ff);
+}
+
+.compass-widget {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent-color);
+  background: rgba(8, 15, 29, 0.85);
+  padding: 0.4rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  font-size: 0.65rem;
+  font-weight: 800;
+  backdrop-filter: blur(8px);
+}
+
+/* Barangay Detail Popover Card */
+.barangay-detail-card {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  background: rgba(8, 15, 29, 0.94);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  animation: slide-up 0.25s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.b-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.b-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.b-type {
+  font-size: 0.68rem;
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.b-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.b-metrics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #e2e8f0;
+}
+
+.b-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.map-footer-info {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  background: rgba(8, 15, 29, 0.5);
+  padding: 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.info-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: 0.75rem;
+  color: #f1f5f9;
+  font-weight: 700;
+  margin-top: 2px;
+}
