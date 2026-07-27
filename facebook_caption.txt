@@ -1,0 +1,28 @@
+🌤️ OFFICIAL CALAUAN WEATHER FORECAST 🌤️
+📅 MONDAY, JULY 27, 2026
+📍 Municipality of Calauan, Laguna Province
+
+Here is your daily meteorological summary generated from ECMWF High-Resolution Spatial Models:
+
+🌅 MORNING (06:00 – 12:00)
+• Condition: Overcast ☁️
+• Temperature: 28.3°C (Min 25.9° – Max 30.5°)
+• Rain Chance: 43% 💧 (0.0 mm)
+• Wind: 2.4 km/h NW 💨
+
+☀️ AFTERNOON (12:00 – 18:00)
+• Condition: Moderate Drizzle 🌦️
+• Temperature: 30.2°C (Min 27.7° – Max 31.6°)
+• Rain Chance: 70% 💧 (1.5 mm)
+• Wind: 4.6 km/h S 💨
+
+🌙 EVENING (18:00 – 00:00)
+• Condition: Overcast ☁️
+• Temperature: 25.3°C (Min 25.0° – Max 26.7°)
+• Rain Chance: 61% 💧 (3.3 mm)
+• Wind: 6.3 km/h SE 💨
+
+⚠️ REMINDER & DISCLAIMER:
+Please note, we are not affiliated with the local government unit (LGU). This weather infographic and forecast are generated for community reference and awareness. For official typhoon warnings, flood advisories, and disaster evacuation decisions, please always coordinate with DOST-PAGASA and the Calauan Municipal Disaster Risk Reduction & Management Office (MDRRMO).
+
+#CalauanLaguna #CalauanWeather #WeatherForecast #LagunaProvince #MDRRMOCalauan #PAGASA #WeatherUpdate #DailyForecast
