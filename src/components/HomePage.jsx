@@ -271,9 +271,12 @@ const HomePage = () => {
         </div>
         {loading ? (
           <div className="dashboard-loading-state">
-            <div className="loading-spinner-large"></div>
-            <h3>Connecting to ECMWF IFS 0.25° Atmospheric Server...</h3>
-            <p>Processing 7-day meteorological grids for Calauan, Laguna</p>
+            <div className="loading-icon-wrapper">
+              <CloudSun size={38} className="loading-weather-icon" />
+              <div className="loading-spinner-ring"></div>
+            </div>
+            <h3 className="loading-title">LOADING PLEASE WAIT...</h3>
+            <p className="loading-subtitle">Processing 7-day meteorological grids for Calauan, Laguna</p>
           </div>
         ) : error ? (
           <div className="dashboard-error-state">
