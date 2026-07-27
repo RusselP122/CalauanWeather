@@ -161,6 +161,9 @@ const CalauanMap = ({ currentWeather, selectedDay }) => {
     setPan({ x: 0, y: 0 });
   };
 
+  const touchStartRef = useRef({ x: 0, y: 0 });
+  const touchPinchDistRef = useRef(null);
+
   // Mouse Wheel Zooming
   const handleWheel = (e) => {
     e.preventDefault();
@@ -184,6 +187,49 @@ const CalauanMap = ({ currentWeather, selectedDay }) => {
   };
 
   const handleMouseUp = () => setIsDragging(false);
+
+  // Touch Event Handlers for Mobile Devices (1-finger drag pan & 2-finger pinch zoom)
+  const handleTouchStart = (e) => {
+    if (e.target.closest('.zoom-controls') || e.target.closest('.barangay-node-group')) return;
+
+    if (e.touches.length === 1) {
+      // 1-Finger Touch Pan
+      setIsDragging(true);
+      touchStartRef.current = {
+        x: e.touches[0].clientX - pan.x,
+        y: e.touches[0].clientY - pan.y
+      };
+      touchPinchDistRef.current = null;
+    } else if (e.touches.length === 2) {
+      // 2-Finger Touch Pinch Zoom
+      setIsDragging(false);
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchPinchDistRef.current = Math.hypot(dx, dy);
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 1 && isDragging) {
+      setPan({
+        x: e.touches[0].clientX - touchStartRef.current.x,
+        y: e.touches[0].clientY - touchStartRef.current.y
+      });
+    } else if (e.touches.length === 2 && touchPinchDistRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const scaleFactor = newDist / touchPinchDistRef.current;
+
+      touchPinchDistRef.current = newDist;
+      setZoomScale((prev) => Math.min(Math.max(prev * scaleFactor, 0.8), 4.0));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    touchPinchDistRef.current = null;
+  };
 
   // Extract base weather metrics
   // 24-Hour Total Daily Precipitation Accumulation (mm)
@@ -257,7 +303,11 @@ const CalauanMap = ({ currentWeather, selectedDay }) => {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab', touchAction: 'none' }}
       >
         <div className="svg-map-wrapper">
           {/* Interactive Zoom Control Panel */}
