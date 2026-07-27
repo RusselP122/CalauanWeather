@@ -1,7 +1,26 @@
 {
-  "active": false,
-  "storm_name": null,
-  "track_id": null,
-  "latest": null,
-  "history": []
+  "active": true,
+  "storm_name": "TC 12W",
+  "track_id": "WP122026",
+  "latest": {
+    "lat": 12.8,
+    "lon": 178.3,
+    "pressure_hpa": 1002.0,
+    "wind_kt": 29.0,
+    "wind_kmh": 54,
+    "movement": "Stationary",
+    "init_time": "2026-07-27 00:00",
+    "category": "Tropical Depression"
+  },
+  "history": [
+    {
+      "cycle": "2026-07-27 00:00",
+      "lat": 12.8,
+      "lon": 178.3,
+      "pressure_hpa": 1002.0,
+      "wind_kt": 29.0,
+      "wind_kmh": 54,
+      "category": "Tropical Depression"
+    }
+  ]
 }
