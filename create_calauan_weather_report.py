@@ -454,19 +454,18 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
     plt.rcParams["font.sans-serif"] = ["Segoe UI", "DejaVu Sans", "Arial", "Helvetica"]
     plt.rcParams["font.family"] = "sans-serif"
 
-    fig = plt.figure(figsize=(18, 10), dpi=300, facecolor=C["bg_deep"])
+    fig = plt.figure(figsize=(11.2, 14.0), dpi=300, facecolor=C["bg_deep"])
 
     gs = GridSpec(
-        3, 2,
-        height_ratios=[0.10, 0.82, 0.08],
-        width_ratios=[0.32, 0.68],
+        4, 1,
+        height_ratios=[0.08, 0.48, 0.38, 0.06],
         wspace=0.02, hspace=0.025
     )
 
-    ax_header   = fig.add_subplot(gs[0, :])
+    ax_header   = fig.add_subplot(gs[0, 0])
     ax_map      = fig.add_subplot(gs[1, 0])
-    ax_forecast = fig.add_subplot(gs[1, 1])
-    ax_footer   = fig.add_subplot(gs[2, :])
+    ax_forecast = fig.add_subplot(gs[2, 0])
+    ax_footer   = fig.add_subplot(gs[3, 0])
 
     for ax in [ax_header, ax_forecast, ax_footer]:
         ax.set_facecolor("none")
@@ -512,16 +511,16 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
         va="center", transform=ax_header.transAxes, zorder=5
     )
     # ECMWF badge
-    badge_x = title_x + 0.255
+    badge_x = title_x + 0.40
     badge = mpatches.FancyBboxPatch(
-        (badge_x, 0.14), 0.135, 0.28,
+        (badge_x, 0.14), 0.20, 0.28,
         boxstyle="round,pad=0.005,rounding_size=0.04",
         facecolor="#00b4d8", edgecolor="none", alpha=0.15,
         transform=ax_header.transAxes, zorder=4
     )
     ax_header.add_patch(badge)
     ax_header.text(
-        badge_x + 0.0675, 0.27, "ECMWF IFS 0.25\u00b0",
+        badge_x + 0.10, 0.27, "ECMWF IFS 0.25\u00b0",
         color="#00e5ff", fontsize=8.5, fontweight="bold",
         ha="center", va="center", transform=ax_header.transAxes, zorder=5
     )
@@ -619,12 +618,12 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
     # Barangay pinpoint markers and labels
     for name, lat, lon in BARANGAY_LABELS:
         # Pinpoint dot marker
-        ax_map.scatter([lon], [lat], color="#00e5ff", s=10, zorder=7, edgecolors="#ffffff", linewidths=0.3)
-        ax_map.scatter([lon], [lat], color="#00e5ff", s=35, zorder=6, alpha=0.25)
+        ax_map.scatter([lon], [lat], color="#00e5ff", s=16, zorder=7, edgecolors="#ffffff", linewidths=0.3)
+        ax_map.scatter([lon], [lat], color="#00e5ff", s=50, zorder=6, alpha=0.25)
         # Label text positioned slightly above pinpoint
         ax_map.text(
             lon, lat + 0.0025, name,
-            color="#e2e8f0", fontsize=5.2, fontweight="bold",
+            color="#e2e8f0", fontsize=7.2, fontweight="bold",
             ha="center", va="bottom", zorder=8,
             path_effects=[pe.withStroke(linewidth=2.0, foreground="#040810")]
         )
@@ -753,41 +752,33 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
         )
 
         # Data rows below — use fixed positions relative to content area
-        data_top = y_cursor - 0.050
-        col_width_usable = 0.275      # stay well within column boundary
+        data_top = y_cursor - 0.060
+        col_width_usable = 0.300      # stay well within column boundary
         val_right = col_x + col_width_usable
-        row_h = 0.038                 # consistent row spacing
 
-        # --- Rain Chance (label + %, bar below with mm) ---
+        # --- Rain Chance (label + % and mm on top line, full-width bar below) ---
         y_row = data_top
         r_color = rain_severity_color(p_data["precip_prob"])
         ax_forecast.text(
             col_x + 0.01, y_row,
-            "Rain Chance", color="#94a3b8", fontsize=7,
+            "Rain Chance", color="#94a3b8", fontsize=8,
             va="top", transform=ax_forecast.transAxes, zorder=4
         )
         ax_forecast.text(
             val_right, y_row,
-            f"{p_data['precip_prob']}%", color=r_color, fontsize=8, fontweight="bold",
+            f"{p_data['precip_prob']}% ({p_data['precip_mm']} mm)", color=r_color, fontsize=8, fontweight="bold",
             ha="right", va="top", transform=ax_forecast.transAxes, zorder=4
         )
-        y_row -= 0.026
-        bar_width = col_width_usable - 0.06  # leave room for mm label
+        y_row -= 0.045
         draw_mini_bar(ax_forecast, col_x + 0.01, y_row,
-                      p_data["precip_prob"], 100, bar_width, 0.012,
+                      p_data["precip_prob"], 100, col_width_usable - 0.01, 0.014,
                       r_color, zorder=4)
-        # Precip mm label right of bar
-        ax_forecast.text(
-            val_right, y_row + 0.004,
-            f"{p_data['precip_mm']} mm", color="#38bdf8", fontsize=6.5,
-            ha="right", va="center", transform=ax_forecast.transAxes, zorder=5
-        )
 
         # --- Wind ---
-        y_row -= row_h
+        y_row -= 0.055
         ax_forecast.text(
             col_x + 0.01, y_row,
-            "Wind", color="#94a3b8", fontsize=7,
+            "Wind", color="#94a3b8", fontsize=8,
             va="top", transform=ax_forecast.transAxes, zorder=4
         )
         ax_forecast.text(
@@ -798,10 +789,10 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
         )
 
         # --- Humidity ---
-        y_row -= row_h
+        y_row -= 0.055
         ax_forecast.text(
             col_x + 0.01, y_row,
-            "Humidity", color="#94a3b8", fontsize=7,
+            "Humidity", color="#94a3b8", fontsize=8,
             va="top", transform=ax_forecast.transAxes, zorder=4
         )
         ax_forecast.text(
@@ -870,11 +861,11 @@ def generate_facebook_caption(today_data, output_path="facebook_caption.txt"):
     }
 
     lines = [
-        "🌤️ OFFICIAL CALAUAN WEATHER FORECAST 🌤️",
+        "🌤️ CALAUAN WEATHER FORECAST 🌤️",
         f"📅 {day_label}",
         "📍 Municipality of Calauan, Laguna Province",
         "",
-        "Here is your daily meteorological summary generated from ECMWF High-Resolution Spatial Models:",
+        "Forecast Weather for today, generated from ECMWF High-Resolution Models:",
         ""
     ]
 
@@ -903,7 +894,7 @@ def generate_facebook_caption(today_data, output_path="facebook_caption.txt"):
         "⚠️ REMINDER & DISCLAIMER:",
         "Please note, we are not affiliated with the local government unit (LGU). This weather infographic and forecast are generated for community reference and awareness. For official typhoon warnings, flood advisories, and disaster evacuation decisions, please always coordinate with DOST-PAGASA and the Calauan Municipal Disaster Risk Reduction & Management Office (MDRRMO).",
         "",
-        "#CalauanLaguna #CalauanWeather #WeatherForecast #LagunaProvince #MDRRMOCalauan #PAGASA #WeatherUpdate #DailyForecast"
+        "#CalauanLaguna #CalauanWeather #WeatherForecast #LagunaProvince #WeatherUpdate #DailyForecast"
     ])
 
     caption_text = "\n".join(lines)
