@@ -3,13 +3,13 @@
   "storm_name": "TC 12W",
   "track_id": "WP122026",
   "latest": {
-    "lat": 13.6,
-    "lon": 175.2,
-    "pressure_hpa": 998.0,
+    "lat": 13.2,
+    "lon": 173.7,
+    "pressure_hpa": 997.0,
     "wind_kt": 45.0,
     "wind_kmh": 83,
-    "movement": "W at 30.9 km/h (16.7 kt)",
-    "init_time": "2026-07-27 12:00",
+    "movement": "WSW at 28.0 km/h (15.1 kt)",
+    "init_time": "2026-07-27 18:00",
     "category": "Tropical Storm"
   },
   "history": [
@@ -36,6 +36,15 @@
       "lat": 13.6,
       "lon": 175.2,
       "pressure_hpa": 998.0,
+      "wind_kt": 45.0,
+      "wind_kmh": 83,
+      "category": "Tropical Storm"
+    },
+    {
+      "cycle": "2026-07-27 18:00",
+      "lat": 13.2,
+      "lon": 173.7,
+      "pressure_hpa": 997.0,
       "wind_kt": 45.0,
       "wind_kmh": 83,
       "category": "Tropical Storm"
