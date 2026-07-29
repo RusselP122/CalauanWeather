@@ -7,6 +7,14 @@
       "trackCount": 1000,
       "standard": "/data/trends/large_5day_12W_standard.png",
       "wide": "/data/trends/large_5day_12W_wide.png"
+    },
+    {
+      "id": "dist_20260728_18_2",
+      "local_id": 2,
+      "name": "Disturbance 2",
+      "trackCount": 172,
+      "standard": "/data/trends/large_5day_dist_20260728_18_2_standard.png",
+      "wide": "/data/trends/large_5day_dist_20260728_18_2_wide.png"
     }
   ],
   "large_15day": [
@@ -14,33 +22,33 @@
       "id": "12W",
       "local_id": 1,
       "name": "TC 12W",
-      "trackCount": 532,
+      "trackCount": 990,
       "standard": "/data/trends/large_15day_12W_standard.png",
       "wide": "/data/trends/large_15day_12W_wide.png"
     },
     {
-      "id": "dist_20260729_00_2",
+      "id": "dist_20260728_12_3",
       "local_id": 2,
       "name": "Disturbance 2",
-      "trackCount": 499,
-      "standard": "/data/trends/large_15day_dist_20260729_00_2_standard.png",
-      "wide": "/data/trends/large_15day_dist_20260729_00_2_wide.png"
+      "trackCount": 419,
+      "standard": "/data/trends/large_15day_dist_20260728_12_3_standard.png",
+      "wide": "/data/trends/large_15day_dist_20260728_12_3_wide.png"
     },
     {
-      "id": "dist_20260728_06_3",
+      "id": "dist_20260728_12_4",
       "local_id": 3,
       "name": "Disturbance 3",
-      "trackCount": 429,
-      "standard": "/data/trends/large_15day_dist_20260728_06_3_standard.png",
-      "wide": "/data/trends/large_15day_dist_20260728_06_3_wide.png"
+      "trackCount": 283,
+      "standard": "/data/trends/large_15day_dist_20260728_12_4_standard.png",
+      "wide": "/data/trends/large_15day_dist_20260728_12_4_wide.png"
     },
     {
-      "id": "dist_20260728_06_4",
-      "local_id": 5,
-      "name": "Disturbance 5",
-      "trackCount": 609,
-      "standard": "/data/trends/large_15day_dist_20260728_06_4_standard.png",
-      "wide": "/data/trends/large_15day_dist_20260728_06_4_wide.png"
+      "id": "dist_20260728_12_5",
+      "local_id": 4,
+      "name": "Disturbance 4",
+      "trackCount": 298,
+      "standard": "/data/trends/large_15day_dist_20260728_12_5_standard.png",
+      "wide": "/data/trends/large_15day_dist_20260728_12_5_wide.png"
     }
   ],
   "base_5day": [
@@ -73,6 +81,6 @@
   ],
   "base_5day_cycle": "2026-07-29 06:00",
   "base_15day_cycle": "2026-07-29 06:00",
-  "large_5day_cycle": "2026-07-29 00:00",
-  "large_15day_cycle": "2026-07-29 00:00"
+  "large_5day_cycle": "2026-07-29 06:00",
+  "large_15day_cycle": "2026-07-29 06:00"
 }
