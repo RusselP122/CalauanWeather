@@ -3,13 +3,13 @@
   "storm_name": "TC 12W",
   "track_id": "WP122026",
   "latest": {
-    "lat": 15.8,
-    "lon": 166.8,
-    "pressure_hpa": 915.0,
-    "wind_kt": 144.0,
-    "wind_kmh": 267,
-    "movement": "NW at 19.5 km/h (10.6 kt)",
-    "init_time": "2026-07-29 18:00",
+    "lat": 16.4,
+    "lon": 165.7,
+    "pressure_hpa": 921.0,
+    "wind_kt": 138.0,
+    "wind_kmh": 256,
+    "movement": "WNW at 22.5 km/h (12.2 kt)",
+    "init_time": "2026-07-30 00:00",
     "category": "Super Typhoon"
   },
   "history": [
@@ -119,6 +119,15 @@
       "pressure_hpa": 915.0,
       "wind_kt": 144.0,
       "wind_kmh": 267,
+      "category": "Super Typhoon"
+    },
+    {
+      "cycle": "2026-07-30 00:00",
+      "lat": 16.4,
+      "lon": 165.7,
+      "pressure_hpa": 921.0,
+      "wind_kt": 138.0,
+      "wind_kmh": 256,
       "category": "Super Typhoon"
     }
   ]
