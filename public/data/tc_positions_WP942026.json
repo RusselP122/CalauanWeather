@@ -1,0 +1,26 @@
+{
+  "active": true,
+  "storm_name": "Invest 94W",
+  "track_id": "WP942026",
+  "latest": {
+    "lat": 14.6,
+    "lon": 126.2,
+    "pressure_hpa": 1004.0,
+    "wind_kt": 19.0,
+    "wind_kmh": 35,
+    "movement": "Stationary",
+    "init_time": "2026-08-01 18:00",
+    "category": "Low Pressure Area"
+  },
+  "history": [
+    {
+      "cycle": "2026-08-01 18:00",
+      "lat": 14.6,
+      "lon": 126.2,
+      "pressure_hpa": 1004.0,
+      "wind_kt": 19.0,
+      "wind_kmh": 35,
+      "category": "Low Pressure Area"
+    }
+  ]
+}
