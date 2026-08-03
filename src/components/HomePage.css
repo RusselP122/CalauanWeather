@@ -745,6 +745,73 @@
 }
 
 /* ==========================================================================
+   Severe Weather Alert Banner
+   ========================================================================== */
+.severe-weather-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 1rem;
+  position: relative;
+  overflow: hidden;
+  animation: severePulse 3s ease-in-out infinite;
+}
+
+@keyframes severePulse {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.35); }
+  50% { border-color: rgba(239, 68, 68, 0.7); }
+}
+
+.severe-banner-stripe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #ef4444, #f97316, #eab308);
+  border-radius: 4px 0 0 4px;
+}
+
+.severe-banner-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 2px;
+  animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.severe-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.severe-banner-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fca5a5;
+  letter-spacing: 0.03em;
+}
+
+.severe-banner-desc {
+  font-size: 0.78rem;
+  color: #d1d5db;
+  line-height: 1.5;
+}
+
+.last-updated-tag {
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* ==========================================================================
    Responsive Breakpoints & Media Queries (Desktop, Tablet & Mobile)
    ========================================================================== */
 

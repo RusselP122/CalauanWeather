@@ -312,17 +312,17 @@ def fetch_calauan_boundary():
 # FETCH WEATHER DATA (TODAY ONLY)
 # =============================================================================
 def fetch_weather_forecast():
-    """Fetch ECMWF IFS 0.25 model data from Open-Meteo — today only."""
+    """Fetch ECMWF IFS HRES 9km model data from Open-Meteo — today only."""
     url = (
         "https://api.open-meteo.com/v1/forecast?"
         f"latitude={CALAUAN_LAT}&longitude={CALAUAN_LON}"
-        "&models=ecmwf_ifs025"
+        "&models=ecmwf_ifs"
         "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,"
         "precipitation,weather_code,wind_speed_10m,wind_direction_10m"
         "&forecast_days=1"
         f"&timezone={TIMEZONE_NAME.replace('/', '%2F')}"
     )
-    print("Fetching ECMWF IFS high-resolution forecast for Calauan...")
+    print("Fetching ECMWF IFS HRES 9km forecast for Calauan...")
     resp = requests.get(url, timeout=15)
     resp.raise_for_status()
     data = resp.json()

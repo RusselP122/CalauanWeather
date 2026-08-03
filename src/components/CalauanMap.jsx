@@ -247,8 +247,11 @@ const CalauanMap = ({ currentWeather, selectedDay }) => {
   const rawRain = selectedDay?.precipSum;
   const baseRain = typeof rawRain === 'number' ? rawRain : (parseFloat(rawRain) || 0.0);
 
-  const rawWind = selectedDay?.windSpeedMax;
+  const rawWind = selectedDay?.windMax;
   const baseWind = Math.round(typeof rawWind === 'number' ? rawWind : (parseFloat(rawWind) || 5.0));
+
+  // Base wind direction from forecast
+  const baseWindDirDeg = selectedDay?.windDirDeg ?? 315;
 
   const rawTemp = selectedDay?.tempMax;
   const baseTempMax = Math.round(typeof rawTemp === 'number' ? rawTemp : (parseFloat(rawTemp) || 30.0));
@@ -267,8 +270,9 @@ const CalauanMap = ({ currentWeather, selectedDay }) => {
       const tempDelta = (1.0 - eFactor) * 1.5;
       const tempC = (baseTempMax + tempDelta).toFixed(1);
 
-      // Compass direction calculation
-      const windDirStr = 'NW';
+      // Compass direction from forecast wind direction
+      const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      const windDirStr = directions[Math.round(baseWindDirDeg / 22.5) % 16];
 
       return {
         ...b,
@@ -278,7 +282,7 @@ const CalauanMap = ({ currentWeather, selectedDay }) => {
         windDirStr
       };
     });
-  }, [baseRain, baseWind, baseTempMax]);
+  }, [baseRain, baseWind, baseTempMax, baseWindDirDeg]);
 
   return (
     <div className="calauan-map-card">

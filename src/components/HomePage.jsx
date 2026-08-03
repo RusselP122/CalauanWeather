@@ -44,7 +44,7 @@ import './HomePage.css';
 const CALAUAN_LAT = 14.1492;
 const CALAUAN_LNG = 121.3152;
 
-// WMO Weather Code Interpreter
+// WMO Weather Code Interpreter — expanded with granular rain/storm severity labels
 const getWeatherDetails = (code) => {
   switch (code) {
     case 0:
@@ -56,26 +56,53 @@ const getWeatherDetails = (code) => {
     case 3:
       return { label: 'Overcast', icon: Cloud, color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
     case 45:
+      return { label: 'Fog', icon: CloudFog, color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' };
     case 48:
-      return { label: 'Foggy', icon: CloudFog, color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' };
+      return { label: 'Depositing Rime Fog', icon: CloudFog, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
     case 51:
+      return { label: 'Light Drizzle', icon: CloudRain, color: '#67e8f9', bg: 'rgba(103, 232, 249, 0.1)' };
     case 53:
+      return { label: 'Moderate Drizzle', icon: CloudRain, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
     case 55:
-      return { label: 'Light Drizzle', icon: CloudRain, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
+      return { label: 'Dense Drizzle', icon: CloudRain, color: '#0891b2', bg: 'rgba(8, 145, 178, 0.15)' };
+    case 56:
+      return { label: 'Freezing Drizzle (Light)', icon: CloudRain, color: '#7dd3fc', bg: 'rgba(125, 211, 252, 0.15)' };
+    case 57:
+      return { label: 'Freezing Drizzle (Dense)', icon: CloudRain, color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
     case 61:
+      return { label: 'Light Rain', icon: CloudRain, color: '#22d3ee', bg: 'rgba(34, 211, 238, 0.15)' };
     case 63:
       return { label: 'Moderate Rain', icon: CloudRain, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.15)' };
     case 65:
-      return { label: 'Heavy Downpour', icon: CloudRain, color: '#2563eb', bg: 'rgba(37, 99, 235, 0.2)' };
+      return { label: 'Heavy Rain', icon: CloudRain, color: '#2563eb', bg: 'rgba(37, 99, 235, 0.2)' };
+    case 66:
+      return { label: 'Freezing Rain (Light)', icon: CloudRain, color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.15)' };
+    case 67:
+      return { label: 'Freezing Rain (Heavy)', icon: CloudRain, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)' };
+    case 71:
+      return { label: 'Light Snowfall', icon: Cloud, color: '#e2e8f0', bg: 'rgba(226, 232, 240, 0.15)' };
+    case 73:
+      return { label: 'Moderate Snowfall', icon: Cloud, color: '#cbd5e1', bg: 'rgba(203, 213, 225, 0.15)' };
+    case 75:
+      return { label: 'Heavy Snowfall', icon: Cloud, color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.2)' };
+    case 77:
+      return { label: 'Snow Grains', icon: Cloud, color: '#cbd5e1', bg: 'rgba(203, 213, 225, 0.15)' };
     case 80:
+      return { label: 'Light Rain Showers', icon: CloudRain, color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
     case 81:
+      return { label: 'Moderate Rain Showers', icon: CloudRain, color: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.15)' };
     case 82:
-      return { label: 'Passing Rain Showers', icon: CloudRain, color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
+      return { label: 'Torrential Rain Showers', icon: CloudRain, color: '#1d4ed8', bg: 'rgba(29, 78, 216, 0.25)' };
+    case 85:
+      return { label: 'Light Snow Showers', icon: Cloud, color: '#e2e8f0', bg: 'rgba(226, 232, 240, 0.15)' };
+    case 86:
+      return { label: 'Heavy Snow Showers', icon: Cloud, color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.2)' };
     case 95:
       return { label: 'Thunderstorm', icon: CloudLightning, color: '#eab308', bg: 'rgba(234, 179, 8, 0.2)' };
     case 96:
+      return { label: 'Thunderstorm w/ Light Hail', icon: CloudLightning, color: '#f97316', bg: 'rgba(249, 115, 22, 0.2)' };
     case 99:
-      return { label: 'Severe Thunderstorm & Hail', icon: CloudLightning, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)' };
+      return { label: 'Intense Thunderstorm w/ Heavy Hail', icon: CloudLightning, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.25)' };
     default:
       return { label: 'Partly Cloudy', icon: CloudSun, color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
   }
@@ -96,6 +123,7 @@ const HomePage = () => {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [chartMetric, setChartMetric] = useState('temp'); // 'temp' | 'rain' | 'wind'
   const [currentTimeStr, setCurrentTimeStr] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -113,31 +141,35 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchEcmwfData = async () => {
-    setLoading(true);
+  const fetchEcmwfData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     setError(null);
     try {
-      // Open-Meteo ECMWF IFS 0.25° High Resolution Forecast API
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&models=ecmwf_ifs025&timezone=Asia%2FManila`;
+      // Open-Meteo ECMWF IFS HRES 9km High Resolution Forecast API
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&models=ecmwf_ifs&timezone=Asia%2FManila`;
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`ECMWF IFS API responded with status ${response.status}`);
+        throw new Error(`ECMWF IFS HRES API responded with status ${response.status}`);
       }
       const data = await response.json();
       setWeatherData(data);
+      setLastUpdated(new Date());
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching ECMWF IFS forecast:', err);
-      // Fallback request to seamless ECMWF endpoint if ifs025 has temporary rate-limit
+      console.error('Error fetching ECMWF IFS HRES forecast:', err);
+      // Fallback request to seamless ECMWF endpoint if ifs has temporary rate-limit
       try {
-        const fallbackUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&timezone=Asia%2FManila`;
+        const fallbackUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&timezone=Asia%2FManila`;
         const res = await fetch(fallbackUrl);
         const data = await res.json();
         setWeatherData(data);
+        setLastUpdated(new Date());
         setLoading(false);
       } catch (fallbackErr) {
-        setError('Unable to fetch live ECMWF IFS weather data. Please check connection.');
+        if (!isBackground) {
+          setError('Unable to fetch live ECMWF IFS HRES weather data. Please check connection.');
+        }
         setLoading(false);
       }
     }
@@ -145,6 +177,9 @@ const HomePage = () => {
 
   useEffect(() => {
     fetchEcmwfData();
+    // Auto-refresh every 15 minutes to keep current weather up to date
+    const refreshInterval = setInterval(() => fetchEcmwfData(true), 15 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // Daily Data Parser (7 Days)
@@ -180,12 +215,41 @@ const HomePage = () => {
     });
   }, [weatherData]);
 
-  // Current Weather Slice (First hourly point matching current hour)
+  // Current Weather — real-time via Open-Meteo `current=` (updated every ~15 min)
   const currentWeather = useMemo(() => {
-    if (!weatherData || !weatherData.hourly) return null;
+    if (!weatherData) return null;
+
+    // Prefer real-time `current` block if available
+    if (weatherData.current) {
+      const c = weatherData.current;
+      const code = c.weather_code;
+      const details = getWeatherDetails(code);
+
+      return {
+        temp: Math.round(c.temperature_2m),
+        apparent: Math.round(c.apparent_temperature),
+        humidity: c.relative_humidity_2m,
+        precipProb: weatherData.daily?.precipitation_probability_max?.[0] ?? 20,
+        precip: c.precipitation,
+        pressure: Math.round(c.pressure_msl),
+        cloudCover: c.cloud_cover,
+        windSpeed: Math.round(c.wind_speed_10m),
+        windDirDeg: c.wind_direction_10m,
+        windDirStr: getWindDirectionStr(c.wind_direction_10m),
+        uvIndex: (weatherData.daily?.uv_index_max?.[0] != null)
+          ? Number(weatherData.daily.uv_index_max[0]).toFixed(1)
+          : '0.0',
+        details,
+        code,
+        observedAt: c.time  // ISO timestamp of the observation
+      };
+    }
+
+    // Fallback: match current hour from hourly array (for endpoints without `current`)
+    if (!weatherData.hourly) return null;
     const h = weatherData.hourly;
     const now = new Date();
-    const currentIsoHour = now.toISOString().slice(0, 13); // e.g. "2026-07-27T08"
+    const currentIsoHour = now.toISOString().slice(0, 13);
 
     let matchIdx = h.time.findIndex((t) => t.startsWith(currentIsoHour));
     if (matchIdx === -1) matchIdx = 0;
@@ -206,7 +270,7 @@ const HomePage = () => {
       windDirStr: getWindDirectionStr(h.wind_direction_10m[matchIdx]),
       uvIndex: (h.uv_index && h.uv_index[matchIdx] != null)
         ? Number(h.uv_index[matchIdx]).toFixed(1)
-        : (weatherData.daily && weatherData.daily.uv_index_max ? Number(weatherData.daily.uv_index_max[0]).toFixed(1) : '0.0'),
+        : (weatherData.daily?.uv_index_max ? Number(weatherData.daily.uv_index_max[0]).toFixed(1) : '0.0'),
       details,
       code
     };
@@ -287,6 +351,29 @@ const HomePage = () => {
           </div>
         ) : (
           <>
+            {/* Severe Weather Alert Banner — shows for heavy rain, torrential showers, thunderstorms */}
+            {currentWeather && [65, 82, 95, 96, 99].includes(currentWeather.code) && (
+              <div className="severe-weather-banner">
+                <div className="severe-banner-stripe"></div>
+                <AlertTriangle size={22} className="severe-banner-icon" />
+                <div className="severe-banner-content">
+                  <strong className="severe-banner-title">
+                    {currentWeather.code === 99 ? '🔴 EXTREME WEATHER ALERT' :
+                     currentWeather.code === 96 ? '🟠 SEVERE THUNDERSTORM WARNING' :
+                     currentWeather.code === 95 ? '🟡 THUNDERSTORM ADVISORY' :
+                     currentWeather.code === 82 ? '🔵 TORRENTIAL RAIN WARNING' :
+                     '🔵 HEAVY RAINFALL ADVISORY'}
+                  </strong>
+                  <span className="severe-banner-desc">
+                    {currentWeather.code >= 95
+                      ? `Active thunderstorm detected over Calauan — ${currentWeather.details.label}. Seek shelter immediately. Monitor PAGASA and local MDRRMO advisories.`
+                      : `${currentWeather.details.label} ongoing — ${currentWeather.precip?.toFixed(1) || '0.0'} mm precipitation. Exercise caution in flood-prone barangays. Monitor PAGASA bulletins.`
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Current Weather & Map Layout Grid */}
             <div className="current-weather-grid">
               {/* Left Column: Current Weather Overview */}
@@ -299,6 +386,9 @@ const HomePage = () => {
                     </div>
                     <div className="live-status-tag">
                       <span className="pulse-dot"></span> CURRENT WEATHER {currentTimeStr ? `• ${currentTimeStr}` : ''}
+                      {lastUpdated && (
+                        <span className="last-updated-tag"> • Updated {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                      )}
                     </div>
                   </div>
 
@@ -409,7 +499,7 @@ const HomePage = () => {
                   Calauan Municipality Agricultural & Pineapple Plantation Bulletin
                 </h4>
                 <p className="advisory-text">
-                  {selectedDay.precipSum > 10.0 ? (
+                  {parseFloat(selectedDay.precipSum) > 10.0 ? (
                     <>⚠️ <strong>Heavy Rainfall Advisory:</strong> Expected rainfall of <strong>{selectedDay.precipSum} mm</strong> may cause localized field water accumulation in pineapple & rice farming sectors across Calauan barangays.</>
                   ) : selectedDay.tempMax > 33 ? (
                     <>☀️ <strong>High Heat Index Alert:</strong> Peak afternoon temperatures reaching <strong>{selectedDay.tempMax}°C</strong>. Farmers and agricultural personnel are advised to schedule field operations during early morning hours.</>
@@ -420,11 +510,11 @@ const HomePage = () => {
               </div>
             </div>
 
-            {/* 7-Day ECMWF IFS Forecast Cards Section */}
+            {/* 7-Day ECMWF IFS HRES 9km Forecast Cards Section */}
             <section className="forecast-section">
               <div className="section-header">
                 <div>
-                  <h2 className="section-title">7-Day ECMWF IFS Forecast</h2>
+                  <h2 className="section-title">7-Day ECMWF IFS HRES Forecast</h2>
                   <p className="section-subtitle">Select any day below to view detailed hourly atmospheric trends & charts</p>
                 </div>
                 <div className="forecast-days-pill">7 DAYS OUTLOOK</div>
@@ -491,7 +581,7 @@ const HomePage = () => {
                   <h3 className="analytics-title">
                     Hourly Atmospheric Trends — {selectedDay.dayName} ({selectedDay.fullDate})
                   </h3>
-                  <p className="analytics-subtitle">High-resolution ECMWF IFS 0.25° model predictions</p>
+                  <p className="analytics-subtitle">High-resolution ECMWF IFS HRES 9km model predictions</p>
                 </div>
 
                 <div className="chart-tab-group">
@@ -554,21 +644,27 @@ const HomePage = () => {
                       <Bar yAxisId="right" dataKey="precip" name="Rainfall Volume (mm)" fill="#0284c7" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   ) : (
-                    <AreaChart data={hourlyChartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+                    <AreaChart data={hourlyChartData} margin={{ top: 20, right: 30, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="windGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
                           <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                         </linearGradient>
+                        <linearGradient id="pressureGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                       <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} />
-                      <YAxis stroke="#10b981" fontSize={11} unit=" km/h" />
+                      <YAxis yAxisId="left" stroke="#10b981" fontSize={11} unit=" km/h" />
+                      <YAxis yAxisId="right" orientation="right" stroke="#a78bfa" fontSize={11} unit=" hPa" domain={['dataMin - 2', 'dataMax + 2']} />
                       <Tooltip
                         contentStyle={{ backgroundColor: '#0d182a', borderColor: '#10b981', borderRadius: '8px', color: '#fff' }}
                       />
                       <Legend />
-                      <Area type="monotone" dataKey="windSpeed" name="Wind Speed (km/h)" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#windGradient)" />
+                      <Area yAxisId="left" type="monotone" dataKey="windSpeed" name="Wind Speed (km/h)" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#windGradient)" />
+                      <Area yAxisId="right" type="monotone" dataKey="pressure" name="Pressure (hPa)" stroke="#a78bfa" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#pressureGradient)" />
                     </AreaChart>
                   )}
                 </ResponsiveContainer>
