@@ -1,15 +1,15 @@
 {
   "active": true,
-  "storm_name": "TC 13W (Invest 94W)",
+  "storm_name": "TC 13W",
   "track_id": "WP132026",
   "latest": {
     "lat": 17.8,
-    "lon": 119.0,
-    "pressure_hpa": 997.0,
+    "lon": 119.8,
+    "pressure_hpa": 998.0,
     "wind_kt": 35.0,
     "wind_kmh": 65,
-    "movement": "NE at 7.7 km/h (4.1 kt)",
-    "init_time": "2026-08-05 06:00",
+    "movement": "E at 14.1 km/h (7.6 kt)",
+    "init_time": "2026-08-05 12:00",
     "category": "Tropical Storm"
   },
   "history": [
@@ -45,6 +45,15 @@
       "lat": 17.8,
       "lon": 119.0,
       "pressure_hpa": 997.0,
+      "wind_kt": 35.0,
+      "wind_kmh": 65,
+      "category": "Tropical Storm"
+    },
+    {
+      "cycle": "2026-08-05 12:00",
+      "lat": 17.8,
+      "lon": 119.8,
+      "pressure_hpa": 998.0,
       "wind_kt": 35.0,
       "wind_kmh": 65,
       "category": "Tropical Storm"

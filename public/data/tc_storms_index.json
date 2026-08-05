@@ -3,18 +3,18 @@
     "track_id": "WP122026",
     "storm_name": "TC 12W",
     "active": true,
-    "last_updated": "2026-08-05 06:00",
-    "latest_lat": 25.6,
-    "latest_lon": 137.2,
+    "last_updated": "2026-08-05 12:00",
+    "latest_lat": 25.9,
+    "latest_lon": 136.2,
     "category": "Typhoon"
   },
   {
     "track_id": "WP132026",
-    "storm_name": "TC 13W (Invest 94W)",
+    "storm_name": "TC 13W",
     "active": true,
-    "last_updated": "2026-08-05 06:00",
+    "last_updated": "2026-08-05 12:00",
     "latest_lat": 17.8,
-    "latest_lon": 119.0,
+    "latest_lon": 119.8,
     "category": "Tropical Storm"
   },
   {
