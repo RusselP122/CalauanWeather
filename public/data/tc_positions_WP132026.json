@@ -1,0 +1,44 @@
+{
+  "active": true,
+  "storm_name": "TC 13W (Invest 94W)",
+  "track_id": "WP132026",
+  "latest": {
+    "lat": 17.5,
+    "lon": 118.7,
+    "pressure_hpa": 998.0,
+    "wind_kt": 29.0,
+    "wind_kmh": 54,
+    "movement": "WNW at 8.0 km/h (4.3 kt)",
+    "init_time": "2026-08-05 00:00",
+    "category": "Tropical Depression"
+  },
+  "history": [
+    {
+      "cycle": "2026-08-04 06:00",
+      "lat": 16.9,
+      "lon": 119.4,
+      "pressure_hpa": 1001.0,
+      "wind_kt": 19.0,
+      "wind_kmh": 35,
+      "category": "Low Pressure Area"
+    },
+    {
+      "cycle": "2026-08-04 12:00",
+      "lat": 17.1,
+      "lon": 119.5,
+      "pressure_hpa": 1002.0,
+      "wind_kt": 19.0,
+      "wind_kmh": 35,
+      "category": "Low Pressure Area"
+    },
+    {
+      "cycle": "2026-08-05 00:00",
+      "lat": 17.5,
+      "lon": 118.7,
+      "pressure_hpa": 998.0,
+      "wind_kt": 29.0,
+      "wind_kmh": 54,
+      "category": "Tropical Depression"
+    }
+  ]
+}
