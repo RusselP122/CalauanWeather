@@ -96,9 +96,17 @@
       "id": "96W",
       "local_id": 2,
       "name": "Invest 96W",
-      "trackCount": 47,
+      "trackCount": 50,
       "standard": "/data/trends/base_5day_96W_standard.png",
       "wide": "/data/trends/base_5day_96W_wide.png"
+    },
+    {
+      "id": "dist_20260806_06_3",
+      "local_id": 3,
+      "name": "Disturbance 3",
+      "trackCount": 47,
+      "standard": "/data/trends/base_5day_dist_20260806_06_3_standard.png",
+      "wide": "/data/trends/base_5day_dist_20260806_06_3_wide.png"
     }
   ],
   "base_15day": [
@@ -106,7 +114,7 @@
       "id": "12W",
       "local_id": 1,
       "name": "TC 12W",
-      "trackCount": 49,
+      "trackCount": 50,
       "standard": "/data/trends/base_15day_12W_standard.png",
       "wide": "/data/trends/base_15day_12W_wide.png"
     },
@@ -114,21 +122,29 @@
       "id": "96W",
       "local_id": 2,
       "name": "Invest 96W",
-      "trackCount": 47,
+      "trackCount": 50,
       "standard": "/data/trends/base_15day_96W_standard.png",
       "wide": "/data/trends/base_15day_96W_wide.png"
     },
     {
-      "id": "dist_20260805_06_4",
-      "local_id": 8,
-      "name": "Disturbance 8",
-      "trackCount": 27,
-      "standard": "/data/trends/base_15day_dist_20260805_06_4_standard.png",
-      "wide": "/data/trends/base_15day_dist_20260805_06_4_wide.png"
+      "id": "dist_20260806_06_3",
+      "local_id": 3,
+      "name": "Disturbance 3",
+      "trackCount": 34,
+      "standard": "/data/trends/base_15day_dist_20260806_06_3_standard.png",
+      "wide": "/data/trends/base_15day_dist_20260806_06_3_wide.png"
+    },
+    {
+      "id": "dist_20260805_12_4",
+      "local_id": 7,
+      "name": "Disturbance 7",
+      "trackCount": 38,
+      "standard": "/data/trends/base_15day_dist_20260805_12_4_standard.png",
+      "wide": "/data/trends/base_15day_dist_20260805_12_4_wide.png"
     }
   ],
-  "base_5day_cycle": "2026-08-06 00:00",
-  "base_15day_cycle": "2026-08-06 00:00",
+  "base_5day_cycle": "2026-08-06 06:00",
+  "base_15day_cycle": "2026-08-06 06:00",
   "large_5day_cycle": "2026-08-06 00:00",
   "large_15day_cycle": "2026-08-06 00:00"
 }
