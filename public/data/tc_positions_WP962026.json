@@ -1,0 +1,26 @@
+{
+  "active": true,
+  "storm_name": "Invest 96W",
+  "track_id": "WP962026",
+  "latest": {
+    "lat": 24.5,
+    "lon": 165.2,
+    "pressure_hpa": 993.0,
+    "wind_kt": 39.0,
+    "wind_kmh": 72,
+    "movement": "Stationary",
+    "init_time": "2026-08-06 00:00",
+    "category": "Tropical Storm"
+  },
+  "history": [
+    {
+      "cycle": "2026-08-06 00:00",
+      "lat": 24.5,
+      "lon": 165.2,
+      "pressure_hpa": 993.0,
+      "wind_kt": 39.0,
+      "wind_kmh": 72,
+      "category": "Tropical Storm"
+    }
+  ]
+}
