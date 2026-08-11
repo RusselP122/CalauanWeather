@@ -312,26 +312,26 @@ def fetch_calauan_boundary():
 # FETCH WEATHER DATA (TODAY ONLY)
 # =============================================================================
 def fetch_weather_forecast():
-    """Fetch ECMWF IFS HRES 9km model data from Open-Meteo — today only."""
+    """Fetch Google WeatherNext 2 model data from Open-Meteo — today only."""
     url = (
-        "https://api.open-meteo.com/v1/forecast?"
+        "https://ensemble-api.open-meteo.com/v1/ensemble?"
         f"latitude={CALAUAN_LAT}&longitude={CALAUAN_LON}"
-        "&models=ecmwf_ifs"
-        "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,"
+        "&models=google_weathernext2_ensemble_mean"
+        "&hourly=temperature_2m,relative_humidity_1000hPa,precipitation_probability,"
         "precipitation,weather_code,wind_speed_10m,wind_direction_10m"
         "&forecast_days=1"
         f"&timezone={TIMEZONE_NAME.replace('/', '%2F')}"
     )
-    print("Fetching ECMWF IFS HRES 9km forecast for Calauan...")
-    resp = requests.get(url, timeout=15)
+    print("Fetching Google WeatherNext 2 forecast for Calauan...")
+    resp = requests.get(url, timeout=30)
     resp.raise_for_status()
     data = resp.json()
 
     hourly = data["hourly"]
     times = hourly["time"]
     temps = hourly["temperature_2m"]
-    humidities = hourly["relative_humidity_2m"]
-    precip_probs = hourly["precipitation_probability"]
+    humidities = hourly.get("relative_humidity_1000hPa") or hourly.get("relative_humidity_2m", [0] * len(times))
+    precip_probs = hourly.get("precipitation_probability", [None] * len(times))
     precips = hourly["precipitation"]
     codes = hourly["weather_code"]
     wind_speeds = hourly["wind_speed_10m"]
@@ -346,7 +346,7 @@ def fetch_weather_forecast():
         hour_obj = {
             "time": dt,
             "temp": temps[i],
-            "humidity": humidities[i],
+            "humidity": humidities[i] if humidities[i] is not None else 0,
             "precip_prob": precip_probs[i] if precip_probs[i] is not None else 0,
             "precip": precips[i] if precips[i] is not None else 0.0,
             "code": codes[i],
@@ -376,8 +376,16 @@ def fetch_weather_forecast():
         max_temp = max(h["temp"] for h in hrs)
         min_temp = min(h["temp"] for h in hrs)
         avg_hum = sum(h["humidity"] for h in hrs) / len(hrs)
-        max_prob = max(h["precip_prob"] for h in hrs)
+        max_prob = max(h["precip_prob"] for h in hrs) if any(h["precip_prob"] for h in hrs) else None
         sum_precip = sum(h["precip"] for h in hrs)
+        
+        # Heuristic for rain chance if API doesn't provide it
+        if max_prob is None or max_prob == 0:
+            if sum_precip == 0: max_prob = 0
+            elif sum_precip < 1: max_prob = 30
+            elif sum_precip < 5: max_prob = 60
+            else: max_prob = 90
+            
         max_wind = max(h["wind_speed"] for h in hrs)
         avg_wind_dir = sum(h["wind_dir"] for h in hrs) / len(hrs)
 

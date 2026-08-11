@@ -44,6 +44,22 @@ import './HomePage.css';
 const CALAUAN_LAT = 14.1492;
 const CALAUAN_LNG = 121.3152;
 
+// Utility to calculate apparent temperature since WeatherNext lacks it
+const calcApparent = (t, rh, ws_kmh) => {
+  if (t == null || rh == null || ws_kmh == null) return t;
+  const ws = ws_kmh / 3.6;
+  const e = (rh / 100) * 6.105 * Math.exp((17.27 * t) / (237.7 + t));
+  return t + 0.33 * e - 0.70 * ws - 4.00;
+};
+
+// Utility to estimate precipitation probability since WeatherNext lacks it natively
+const calcPrecipProb = (mm) => {
+  if (mm == null || mm === 0) return 0;
+  if (mm < 1) return 30;
+  if (mm < 5) return 60;
+  return 90;
+};
+
 // WMO Weather Code Interpreter — expanded with granular rain/storm severity labels
 const getWeatherDetails = (code) => {
   switch (code) {
@@ -141,24 +157,24 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchEcmwfData = async (isBackground = false) => {
+  const fetchWeatherNextData = async (isBackground = false) => {
     if (!isBackground) setLoading(true);
     setError(null);
     try {
-      // Open-Meteo ECMWF IFS HRES 9km High Resolution Forecast API
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&models=ecmwf_ifs&timezone=Asia%2FManila`;
+      // Open-Meteo Google WeatherNext 2 Ensemble Forecast API
+      const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&current=temperature_2m,relative_humidity_1000hPa,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_1000hPa,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&models=google_weathernext2_ensemble_mean&timezone=Asia%2FManila`;
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`ECMWF IFS HRES API responded with status ${response.status}`);
+        throw new Error(`Google WeatherNext 2 API responded with status ${response.status}`);
       }
       const data = await response.json();
       setWeatherData(data);
       setLastUpdated(new Date());
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching ECMWF IFS HRES forecast:', err);
-      // Fallback request to seamless ECMWF endpoint if ifs has temporary rate-limit
+      console.error('Error fetching Google WeatherNext 2 forecast:', err);
+      // Fallback request to seamless Open-Meteo endpoint if primary has temporary rate-limit
       try {
         const fallbackUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CALAUAN_LAT}&longitude=${CALAUAN_LNG}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m,wind_direction_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant&timezone=Asia%2FManila`;
         const res = await fetch(fallbackUrl);
@@ -168,7 +184,7 @@ const HomePage = () => {
         setLoading(false);
       } catch (fallbackErr) {
         if (!isBackground) {
-          setError('Unable to fetch live ECMWF IFS HRES weather data. Please check connection.');
+          setError('Unable to fetch live WeatherNext 2 data. Please check connection.');
         }
         setLoading(false);
       }
@@ -176,9 +192,9 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    fetchEcmwfData();
+    fetchWeatherNextData();
     // Auto-refresh every 15 minutes to keep current weather up to date
-    const refreshInterval = setInterval(() => fetchEcmwfData(true), 15 * 60 * 1000);
+    const refreshInterval = setInterval(() => fetchWeatherNextData(true), 15 * 60 * 1000);
     return () => clearInterval(refreshInterval);
   }, []);
 
@@ -202,10 +218,10 @@ const HomePage = () => {
         details,
         tempMax: Math.round(d.temperature_2m_max[idx]),
         tempMin: Math.round(d.temperature_2m_min[idx]),
-        apparentMax: Math.round(d.apparent_temperature_max[idx]),
-        apparentMin: Math.round(d.apparent_temperature_min[idx]),
+        apparentMax: Math.round(d.apparent_temperature_max?.[idx] ?? d.temperature_2m_max[idx]),
+        apparentMin: Math.round(d.apparent_temperature_min?.[idx] ?? d.temperature_2m_min[idx]),
         precipSum: d.precipitation_sum[idx]?.toFixed(1) || '0.0',
-        precipProb: d.precipitation_probability_max ? d.precipitation_probability_max[idx] : 30,
+        precipProbMax: d.precipitation_probability_max?.[idx] ?? calcPrecipProb(d.precipitation_sum[idx]),
         windMax: Math.round(d.wind_speed_10m_max[idx]),
         windDirDeg: d.wind_direction_10m_dominant ? d.wind_direction_10m_dominant[idx] : 90,
         uvMax: d.uv_index_max[idx]?.toFixed(1) || '0.0',
@@ -227,9 +243,9 @@ const HomePage = () => {
 
       return {
         temp: Math.round(c.temperature_2m),
-        apparent: Math.round(c.apparent_temperature),
-        humidity: c.relative_humidity_2m,
-        precipProb: weatherData.daily?.precipitation_probability_max?.[0] ?? 20,
+        apparent: Math.round(calcApparent(c.temperature_2m, c.relative_humidity_1000hPa ?? c.relative_humidity_2m, c.wind_speed_10m)),
+        humidity: c.relative_humidity_1000hPa ?? c.relative_humidity_2m ?? 0,
+        precipProb: weatherData.daily?.precipitation_probability_max?.[0] ?? calcPrecipProb(c.precipitation),
         precip: c.precipitation,
         pressure: Math.round(c.pressure_msl),
         cloudCover: c.cloud_cover,
@@ -259,9 +275,9 @@ const HomePage = () => {
 
     return {
       temp: Math.round(h.temperature_2m[matchIdx]),
-      apparent: Math.round(h.apparent_temperature[matchIdx]),
-      humidity: h.relative_humidity_2m[matchIdx],
-      precipProb: h.precipitation_probability ? h.precipitation_probability[matchIdx] : 20,
+      apparent: Math.round(calcApparent(h.temperature_2m[matchIdx], h.relative_humidity_1000hPa?.[matchIdx] ?? h.relative_humidity_2m?.[matchIdx], h.wind_speed_10m[matchIdx])),
+      humidity: h.relative_humidity_1000hPa?.[matchIdx] ?? h.relative_humidity_2m?.[matchIdx] ?? 0,
+      precipProb: h.precipitation_probability?.[matchIdx] ?? calcPrecipProb(h.precipitation[matchIdx]),
       precip: h.precipitation[matchIdx],
       pressure: Math.round(h.pressure_msl[matchIdx]),
       cloudCover: h.cloud_cover[matchIdx],
@@ -297,9 +313,9 @@ const HomePage = () => {
         time: timeLabel,
         rawTime: h.time[i],
         temp: Math.round(h.temperature_2m[i]),
-        apparent: Math.round(h.apparent_temperature[i]),
-        precipProb: h.precipitation_probability ? h.precipitation_probability[i] : 0,
-        precip: h.precipitation ? parseFloat(h.precipitation[i].toFixed(1)) : 0,
+        apparent: Math.round(calcApparent(h.temperature_2m[i], h.relative_humidity_1000hPa?.[i] ?? h.relative_humidity_2m?.[i], h.wind_speed_10m[i])),
+        precipProb: h.precipitation_probability?.[i] ?? calcPrecipProb(h.precipitation?.[i]),
+        precip: h.precipitation?.[i] ? parseFloat(h.precipitation[i].toFixed(1)) : 0,
         windSpeed: Math.round(h.wind_speed_10m[i]),
         pressure: Math.round(h.pressure_msl[i]),
         weatherCode: h.weather_code[i]
@@ -685,7 +701,7 @@ const HomePage = () => {
                       <IconComp size={24} color={details.color} className="hour-icon" />
                       <span className="hour-temp">{hour.temp}°C</span>
                       <div className="hour-rain">
-                        <Droplets size={10} />
+                        <CloudRain size={10} />
                         <span>{hour.precipProb}%</span>
                       </div>
                     </div>
