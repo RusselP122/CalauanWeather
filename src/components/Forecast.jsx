@@ -211,10 +211,10 @@ const FORECAST_OPTIONS = FORECAST_DATES.flatMap((dateStr) =>
 );
 
 const modelsList = [
-  { id: "fnv3_base", name: "GDM FNV3 Base", key: "fnv3-base", source: "GDM Ensemble" },
-  { id: "fnv3p1", name: "GDM FNV3P1", key: "fnv3p1", source: "GDM FNV3P1 Ensemble" },
+  { id: "fnv3_base", name: "GDM WNC Base", key: "fnv3-base", source: "GDM Ensemble" },
+  { id: "fnv3p1", name: "GDM WNCP1", key: "fnv3p1", source: "GDM FNV3P1 Ensemble" },
   { id: "oper", name: "GDM OPER", key: "oper", source: "GDM OPER Ensemble" },
-  { id: "fnv3_large", name: "FNV3 Large", key: "fnv3-large", source: "GDM Large Ensemble" },
+  { id: "fnv3_large", name: "WNC Large", key: "fnv3-large", source: "GDM Large Ensemble" },
   { id: "ifs", name: "ECMWF IFS", key: "ifs", source: "ECMWF IFS Ensemble" },
   { id: "aifs", name: "ECMWF AIFS", key: "aifs", source: "ECMWF AIFS Ensemble" },
   { id: "aigefs", name: "AI-GEFS", key: "aigefs", source: "NOAA AI-GEFS Ensemble" },
@@ -223,16 +223,16 @@ const modelsList = [
 const specsData = [
   {
     id: "fnv3_base",
-    name: "GDM FNV3 Base",
+    name: "GDM WNC Base",
     res: "0.25° (~28km)",
     members: "50 members",
     type: "DL-initialized",
-    desc: "Google DeepMind FuXi-Nazca V3 core meteorological forecasting model ensemble (FNV3P2).",
+    desc: "Google DeepMind FuXi-Nazca V3 core meteorological forecasting model ensemble (WNCP2).",
     source: "Global DeepLearning Model (GDM)",
   },
   {
     id: "fnv3p1",
-    name: "GDM FNV3P1",
+    name: "GDM WNCP1",
     res: "0.25° (~28km)",
     members: "50 members",
     type: "DL-initialized",
@@ -250,7 +250,7 @@ const specsData = [
   },
   {
     id: "fnv3_large",
-    name: "FNV3 Large Ensemble",
+    name: "WNC Large Ensemble",
     res: "0.25° (~28km)",
     members: "1000 members",
     type: "DL Extreme Ensemble",
@@ -1192,7 +1192,7 @@ const Forecast = () => {
                         <div className="detail-item">
                           <dt>Model Engine</dt>
                           <dd>
-                            {selectedModel === "fnv3_large" ? "FNV3 Large Ensemble" : selectedModel === "fnv3p1" ? "GDM FNV3P1" : selectedModel === "oper" ? "GDM OPER" : "GDM FNV3 Base"}
+                            {selectedModel === "fnv3_large" ? "WNC Large Ensemble" : selectedModel === "fnv3p1" ? "GDM WNCP1" : selectedModel === "oper" ? "GDM OPER" : "GDM WNC Base"}
                           </dd>
                         </div>
                         <div className="detail-item">

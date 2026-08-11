@@ -809,7 +809,7 @@ for mode in ['standard', 'cluster']:
     start_date = forecast_start_date_text or "Start"
     end_date = forecast_end_date_text or "End"
     title_suffix = " (Clusters)" if mode == 'cluster' else ""
-    title_obj = ax.set_title(f"FNV3 1000 Ensemble 15-Day Forecast Tropical Cyclone Tracks{title_suffix}\nWestern Pacific ({start_date} to {end_date})", fontsize=14, weight='bold', color='#f8fafc', pad=15)
+    title_obj = ax.set_title(f"WNC 1000 Ensemble 15-Day Forecast Tropical Cyclone Tracks{title_suffix}\nWestern Pacific ({start_date} to {end_date})", fontsize=14, weight='bold', color='#f8fafc', pad=15)
     
     try:
         init_time_str = init_times[0].replace(':', '').replace(' ', 'T') if len(init_times) > 0 else '20250621T1200'
@@ -831,4 +831,4 @@ for mode in ['standard', 'cluster']:
 if skipped_tracks > 0:
     print(f"Skipped {skipped_tracks} tracks details:")
     for detail in skipped_details[:10]:
-        print(f"  - {detail}")
+        print(f"  - {detail}")

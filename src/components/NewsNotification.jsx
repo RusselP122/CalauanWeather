@@ -27,7 +27,7 @@ const CHANGELOG = [
     id: 10,
     date: 'June 11, 2026',
     title: 'Run-to-Run Forecast Trends',
-    description: 'Introducing Run-to-Run Forecast Trends! Track how tropical cyclone forecasts evolve across the last 4 model cycles. See genesis probability trends, peak wind intensity changes, and ensemble agreement. Available for both FNV3 Base (50-member) and Large (1000-member) ensembles with 5-day and 15-day horizons.'
+    description: 'Introducing Run-to-Run Forecast Trends! Track how tropical cyclone forecasts evolve across the last 4 model cycles. See genesis probability trends, peak wind intensity changes, and ensemble agreement. Available for both WNC Base (50-member) and Large (1000-member) ensembles with 5-day and 15-day horizons.'
   },
   {
     id: 9,
@@ -45,19 +45,19 @@ const CHANGELOG = [
     id: 7,
     date: 'May 21, 2026',
     title: 'Tropical Cyclone Development Outlook',
-    description: 'We will create a Tropical Cyclone Development Area Outlook in FNV3 and ECMWF to help identify potential genesis and monitoring zones for developing tropical disturbances. It will soon be deploy on the website.'
+    description: 'We will create a Tropical Cyclone Development Area Outlook in WNC and ECMWF to help identify potential genesis and monitoring zones for developing tropical disturbances. It will soon be deploy on the website.'
   },
   {
     id: 6,
     date: 'May 20, 2026',
     title: 'Ensemble Filter',
-    description: 'Take control of large forecasts with the new Ensemble Filter! Now available on the FNV3 Large dataset, this powerful tool lets you filter through massive ensemble member tracks dynamically by Peak Intensity (from Super Typhoon down to Low Pressure Areas), PH Landfall Regions (Luzon, Visayas, Mindanao), and Trajectory behavior (Direct Landfall, Graze, or Recurve).'
+    description: 'Take control of large forecasts with the new Ensemble Filter! Now available on the WNC Large dataset, this powerful tool lets you filter through massive ensemble member tracks dynamically by Peak Intensity (from Super Typhoon down to Low Pressure Areas), PH Landfall Regions (Luzon, Visayas, Mindanao), and Trajectory behavior (Direct Landfall, Graze, or Recurve).'
   },
   {
     id: 5,
     date: 'May 19, 2026',
     title: 'Redesigned Track Markers',
-    description: 'Forecast track markers across all models (FNV3, ECMWF IFS, AIFS) have been redesigned to a clean donut/ring style — transparent center with a vibrant pressure-colored border and a subtle shadow — both on the static forecast maps and the interactive Ensemble Tracker.'
+    description: 'Forecast track markers across all models (WNC, ECMWF IFS, AIFS) have been redesigned to a clean donut/ring style — transparent center with a vibrant pressure-colored border and a subtle shadow — both on the static forecast maps and the interactive Ensemble Tracker.'
   },
   {
     id: 4,
@@ -69,7 +69,7 @@ const CHANGELOG = [
     id: 1,
     date: 'May 17, 2026',
     title: 'Ensemble Mean',
-    description: 'Ensemble Mean computation now strictly requires a minimum of 25 members for FNV3/ECMWF datasets for accurate mean track.'
+    description: 'Ensemble Mean computation now strictly requires a minimum of 25 members for WNC/ECMWF datasets for accurate mean track.'
   },
   {
     id: 2,

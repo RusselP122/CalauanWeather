@@ -329,8 +329,8 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
     )
 
     model_display = {
-        "FNV3P2": "GDM FNV3 Base",
-        "FNV3P1": "GDM FNV3P1",
+        "FNV3P2": "GDM WNC Base",
+        "FNV3P1": "GDM WNCP1",
         "OPER": "GDM OPER"
     }.get(model, model)
 
