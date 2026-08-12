@@ -108,7 +108,7 @@ WMO_CODES = {
     81: ("Moderate Showers",    "Showers",      "rain",          "#2563eb"),
     82: ("Violent Showers",     "Heavy Rain",   "heavy_rain",    "#7c3aed"),
     95: ("Thunderstorm",        "T-Storm",      "thunderstorm",  "#dc2626"),
-    96: ("T-Storm w/ Hail",     "Hailstorm",    "thunderstorm",  "#b91c1c"),
+    96: ("Hail",     "Hailstorm",    "thunderstorm",  "#b91c1c"),
     99: ("Heavy Thunderstorm",  "Severe Storm", "thunderstorm",  "#991b1b"),
 }
 
@@ -518,7 +518,7 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
         color="#94a3b8", fontsize=10, fontweight="normal",
         va="center", transform=ax_header.transAxes, zorder=5
     )
-    # ECMWF badge
+    # Weathernext 2 badge
     badge_x = title_x + 0.40
     badge = mpatches.FancyBboxPatch(
         (badge_x, 0.14), 0.20, 0.28,
@@ -528,7 +528,7 @@ def generate_report_infographic(today_data, boundary_geojson, output_path="calau
     )
     ax_header.add_patch(badge)
     ax_header.text(
-        badge_x + 0.10, 0.27, "ECMWF IFS 0.25\u00b0",
+        badge_x + 0.10, 0.27, "Weathernext 2 0.25\u00b0",
         color="#00e5ff", fontsize=8.5, fontweight="bold",
         ha="center", va="center", transform=ax_header.transAxes, zorder=5
     )
@@ -873,7 +873,7 @@ def generate_facebook_caption(today_data, output_path="facebook_caption.txt"):
         f"📅 {day_label}",
         "📍 Municipality of Calauan, Laguna Province",
         "",
-        "Forecast Weather for today, generated from ECMWF High-Resolution Models:",
+        "Forecast Weather for today, generated from Weathernext 2:",
         ""
     ]
 
