@@ -33,20 +33,20 @@
       "wide": "/data/trends/large_5day_19W_wide.png"
     },
     {
-      "id": "dist_20260823_06_5",
+      "id": "dist_20260823_12_4",
       "local_id": 5,
       "name": "Disturbance 5",
       "trackCount": 880,
-      "standard": "/data/trends/large_5day_dist_20260823_06_5_standard.png",
-      "wide": "/data/trends/large_5day_dist_20260823_06_5_wide.png"
+      "standard": "/data/trends/large_5day_dist_20260823_12_4_standard.png",
+      "wide": "/data/trends/large_5day_dist_20260823_12_4_wide.png"
     },
     {
-      "id": "dist_20260823_06_6",
+      "id": "dist_20260823_12_5",
       "local_id": 6,
       "name": "Disturbance 6",
       "trackCount": 367,
-      "standard": "/data/trends/large_5day_dist_20260823_06_6_standard.png",
-      "wide": "/data/trends/large_5day_dist_20260823_06_6_wide.png"
+      "standard": "/data/trends/large_5day_dist_20260823_12_5_standard.png",
+      "wide": "/data/trends/large_5day_dist_20260823_12_5_wide.png"
     }
   ],
   "large_15day": [
@@ -83,20 +83,20 @@
       "wide": "/data/trends/large_15day_19W_wide.png"
     },
     {
-      "id": "dist_20260823_06_4",
+      "id": "dist_20260823_12_4",
       "local_id": 6,
       "name": "Disturbance 6",
       "trackCount": 757,
-      "standard": "/data/trends/large_15day_dist_20260823_06_4_standard.png",
-      "wide": "/data/trends/large_15day_dist_20260823_06_4_wide.png"
+      "standard": "/data/trends/large_15day_dist_20260823_12_4_standard.png",
+      "wide": "/data/trends/large_15day_dist_20260823_12_4_wide.png"
     },
     {
-      "id": "dist_20260823_06_5",
+      "id": "dist_20260823_12_6",
       "local_id": 7,
       "name": "Disturbance 7",
       "trackCount": 123,
-      "standard": "/data/trends/large_15day_dist_20260823_06_5_standard.png",
-      "wide": "/data/trends/large_15day_dist_20260823_06_5_wide.png"
+      "standard": "/data/trends/large_15day_dist_20260823_12_6_standard.png",
+      "wide": "/data/trends/large_15day_dist_20260823_12_6_wide.png"
     },
     {
       "id": "dist_20260824_00_9",
