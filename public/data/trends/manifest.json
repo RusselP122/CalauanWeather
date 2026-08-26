@@ -125,12 +125,12 @@
       "wide": "/data/trends/base_5day_99W_wide.png"
     },
     {
-      "id": "dist_20260824_12_5",
+      "id": "dist_20260824_18_6",
       "local_id": 6,
       "name": "Disturbance 6",
       "trackCount": 43,
-      "standard": "/data/trends/base_5day_dist_20260824_12_5_standard.png",
-      "wide": "/data/trends/base_5day_dist_20260824_12_5_wide.png"
+      "standard": "/data/trends/base_5day_dist_20260824_18_6_standard.png",
+      "wide": "/data/trends/base_5day_dist_20260824_18_6_wide.png"
     }
   ],
   "base_15day": [
