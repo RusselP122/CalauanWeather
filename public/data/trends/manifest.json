@@ -151,8 +151,8 @@
       "wide": "/data/trends/base_15day_94W_wide.png"
     }
   ],
-  "base_5day_cycle": "2026-08-31 00:00",
-  "base_15day_cycle": "2026-08-31 00:00",
+  "base_5day_cycle": "2026-08-31 06:00",
+  "base_15day_cycle": "2026-08-31 06:00",
   "large_5day_cycle": "2026-08-31 00:00",
   "large_15day_cycle": "2026-08-31 00:00"
 }
