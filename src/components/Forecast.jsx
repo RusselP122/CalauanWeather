@@ -78,8 +78,8 @@ const FORECAST_OPTIONS = FORECAST_DATES.flatMap((dateStr) =>
     const fnv3p15Day = isMidnight ? `/assets/tropical_cyclone_5day_forecast_FNV3P1_${dateStr}.png` : `/assets/tropical_cyclone_5day_forecast_FNV3P1_${modelTime}.png`;
     const fnv3p115Day = isMidnight ? `/assets/tropical_cyclone_15day_forecast_FNV3P1_${dateStr}.png` : `/assets/tropical_cyclone_15day_forecast_FNV3P1_${modelTime}.png`;
 
-    const oper5Day = isMidnight ? `/assets/tropical_cyclone_5day_forecast_OPER_${dateStr}.png` : `/assets/tropical_cyclone_5day_forecast_OPER_${modelTime}.png`;
-    const oper15Day = isMidnight ? `/assets/tropical_cyclone_15day_forecast_OPER_${dateStr}.png` : `/assets/tropical_cyclone_15day_forecast_OPER_${modelTime}.png`;
+    const wnv35Day = isMidnight ? `/assets/tropical_cyclone_5day_forecast_WNV3_${dateStr}.png` : `/assets/tropical_cyclone_5day_forecast_WNV3_${modelTime}.png`;
+    const wnv315Day = isMidnight ? `/assets/tropical_cyclone_15day_forecast_WNV3_${dateStr}.png` : `/assets/tropical_cyclone_15day_forecast_WNV3_${modelTime}.png`;
 
     const fnv3Large5Day = isMidnight ? `/assets/fnv3_tropical_cyclone_5day_forecast_${dateStr}.png` : `/assets/fnv3_tropical_cyclone_5day_forecast_${modelTime}.png`;
     const fnv3Large15Day = isMidnight ? `/assets/fnv3_tropical_cyclone_15day_forecast_${dateStr}.png` : `/assets/fnv3_tropical_cyclone_15day_forecast_${modelTime}.png`;
@@ -127,20 +127,20 @@ const FORECAST_OPTIONS = FORECAST_DATES.flatMap((dateStr) =>
         imageSrc: getAssetUrl(fnv3p115Day),
       },
       {
-        id: `oper-5day-${modelTime}`,
+        id: `wnv3-5day-${modelTime}`,
         type: "5day",
-        model: "oper",
+        model: "wnv3",
         label: `5-day forecast (${dateStr} ${hourUtc}:00 UTC)`,
         modelTime,
-        imageSrc: getAssetUrl(oper5Day),
+        imageSrc: getAssetUrl(wnv35Day),
       },
       {
-        id: `oper-15day-${modelTime}`,
+        id: `wnv3-15day-${modelTime}`,
         type: "15day",
-        model: "oper",
+        model: "wnv3",
         label: `15-day forecast (${dateStr} ${hourUtc}:00 UTC)`,
         modelTime,
-        imageSrc: getAssetUrl(oper15Day),
+        imageSrc: getAssetUrl(wnv315Day),
       },
       {
         id: `fnv3-large-5day-${modelTime}`,
@@ -211,9 +211,9 @@ const FORECAST_OPTIONS = FORECAST_DATES.flatMap((dateStr) =>
 );
 
 const modelsList = [
+  { id: "wnv3", name: "GDM WNCv3", key: "wnv3", source: "GDM WNCv3 Ensemble" },
   { id: "fnv3_base", name: "GDM WNC Base", key: "fnv3-base", source: "GDM Ensemble" },
   { id: "fnv3p1", name: "GDM WNCP1", key: "fnv3p1", source: "GDM FNV3P1 Ensemble" },
-  { id: "oper", name: "GDM OPER", key: "oper", source: "GDM OPER Ensemble" },
   { id: "fnv3_large", name: "WNC Large", key: "fnv3-large", source: "GDM Large Ensemble" },
   { id: "ifs", name: "ECMWF IFS", key: "ifs", source: "ECMWF IFS Ensemble" },
   { id: "aifs", name: "ECMWF AIFS", key: "aifs", source: "ECMWF AIFS Ensemble" },
@@ -240,13 +240,13 @@ const specsData = [
     source: "Global DeepLearning Model (GDM)",
   },
   {
-    id: "oper",
-    name: "GDM OPER",
+    id: "wnv3",
+    name: "GDM WNCv3",
     res: "0.25° (~28km)",
-    members: "50 members",
-    type: "Operational Ensemble",
-    desc: "The best operational cyclone forecasts from Google models, utilizing historical version adjustments.",
-    source: "Operational Ensemble",
+    members: "64 members",
+    type: "DL-initialized",
+    desc: "Google DeepMind WeatherNext Cyclone V3 (WNV3) operational 64-member ensemble forecasting model.",
+    source: "Global DeepLearning Model (GDM)",
   },
   {
     id: "fnv3_large",
@@ -1192,7 +1192,7 @@ const Forecast = () => {
                         <div className="detail-item">
                           <dt>Model Engine</dt>
                           <dd>
-                            {selectedModel === "fnv3_large" ? "WNC Large Ensemble" : selectedModel === "fnv3p1" ? "GDM WNCP1" : selectedModel === "oper" ? "GDM OPER" : "GDM WNC Base"}
+                            {selectedModel === "fnv3_large" ? "WNC Large Ensemble" : selectedModel === "wnv3" ? "GDM WNCv3" : selectedModel === "fnv3p1" ? "GDM WNCP1" : "GDM WNC Base"}
                           </dd>
                         </div>
                         <div className="detail-item">

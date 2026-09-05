@@ -94,8 +94,8 @@ jobs:
           git add -f public/data/fnv3p2_paired_latest.enc || true
           git add -f public/data/fnv3p1_latest.enc || true
           git add -f public/data/fnv3p1_paired_latest.enc || true
-          git add -f public/data/oper_latest.enc || true
-          git add -f public/data/oper_paired_latest.enc || true
+          git add -f public/data/wnv3_latest.enc || true
+          git add -f public/data/wnv3_paired_latest.enc || true
           git add -f public/data/fnv3p2_*.enc || true
           git add -f public/data/fnv3p2_paired_*.enc || true
           git add -f public/data/cycles_manifest.json || true

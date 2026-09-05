@@ -16,7 +16,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 
 def get_latest_run_datetime():
-    models = ["FNV3P2", "FNV3P1", "OPER"]
+    models = ["WNV3", "FNV3P2", "FNV3P1"]
     today = datetime.now(timezone.utc).date()
     dates = [today, today - timedelta(days=1), today - timedelta(days=2), today - timedelta(days=3)]
     hours_desc = ["18", "12", "06", "00"]
@@ -302,9 +302,9 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
     )
 
     model_display = {
+        "WNV3": "GDM WNCv3",
         "FNV3P2": "GDM WNC Base",
-        "FNV3P1": "GDM WNCP1",
-        "OPER": "GDM OPER"
+        "FNV3P1": "GDM WNCP1"
     }.get(model, model)
 
     # Add small legend with forecast info (Slate theme text)
@@ -322,7 +322,8 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
     # Add title (Slate theme color)
     start_date = forecast_start_date_text or "Start"
     end_date = forecast_end_date_text or "End"
-    ax.set_title(f"{model_display} 50 Ensemble 5-Day Forecast Tropical Cyclone Tracks\nWestern Pacific ({start_date} to {end_date})", fontsize=14, weight='bold', color='#f8fafc', pad=15)
+    ens_count = 64 if model == "WNV3" else 50
+    ax.set_title(f"{model_display} {ens_count} Ensemble 5-Day Forecast Tropical Cyclone Tracks\nWestern Pacific ({start_date} to {end_date})", fontsize=14, weight='bold', color='#f8fafc', pad=15)
 
     # Save the plot
     try:
@@ -348,8 +349,8 @@ def main():
         print(f"Error finding latest run: {e}")
         exit()
 
-    models = ["FNV3P2", "FNV3P1", "OPER"]
-    base_model_candidates = [m for m in models if m != "OPER"]
+    models = ["WNV3", "FNV3P2", "FNV3P1"]
+    base_model_candidates = list(models)
 
     found_models = []
     base_model_identified = None
@@ -359,22 +360,46 @@ def main():
         try:
             resp = requests.head(url, allow_redirects=True, timeout=10)
             if resp.status_code == 200:
-                found_models.append((model, url))
+                found_models.append((model, url, date_str, hour_str))
                 if model in base_model_candidates and base_model_identified is None:
                     base_model_identified = model
+                continue
         except requests.RequestException:
-            continue
+            pass
+
+        # If primary cycle is not found for this specific model, fallback to searching recent cycles
+        today = datetime.now(timezone.utc).date()
+        fallback_dates = [today, today - timedelta(days=1), today - timedelta(days=2), today - timedelta(days=3)]
+        for fd in fallback_dates:
+            fds = fd.strftime("%Y_%m_%d")
+            for fh in ["18", "12", "06", "00"]:
+                if fds == date_str and fh == hour_str:
+                    continue
+                f_url = f"https://deepmind.google.com/science/weatherlab/download/cyclones/{model}/ensemble/cyclogenesis/csv/{model}_{fds}T{fh}_00_cyclogenesis.csv"
+                try:
+                    f_resp = requests.head(f_url, allow_redirects=True, timeout=5)
+                    if f_resp.status_code == 200:
+                        print(f"Fallback run found for {model}: {fds}T{fh}:00")
+                        found_models.append((model, f_url, fds, fh))
+                        if model in base_model_candidates and base_model_identified is None:
+                            base_model_identified = model
+                        break
+                except requests.RequestException:
+                    continue
+            else:
+                continue
+            break
 
     if not found_models:
         print(f"Error: No model datasets found for cycle {date_str}T{hour_str}:00")
         exit()
 
-    print(f"Models found with data for cycle {date_str}T{hour_str}:00: {[m[0] for m in found_models]}")
+    print(f"Models found with data: {[m[0] + ' (' + m[2] + 'T' + m[3] + ')' for m in found_models]}")
     print(f"Identified primary base model: {base_model_identified}")
 
-    for model, url in found_models:
+    for model, url, m_date_str, m_hour_str in found_models:
         is_base = (model == base_model_identified)
-        process_and_plot(model, url, date_str, hour_str, is_base)
+        process_and_plot(model, url, m_date_str, m_hour_str, is_base)
 
 if __name__ == "__main__":
     main()

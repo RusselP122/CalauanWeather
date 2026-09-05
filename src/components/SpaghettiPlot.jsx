@@ -73,13 +73,13 @@ function parseCSV(text) {
 // Forcast3.py → public/data/fnv3_large_latest.dat       (large ensemble members)
 // FNV3 paired CSVs → official ensemble mean tracks (sample=-1) per dataset
 const LOCAL_CSV = {
+    wnv3: "/data/wnv3_latest.enc",
     fnv3p2: "/data/fnv3p2_latest.enc",
     fnv3p1: "/data/fnv3p1_latest.enc",
-    oper: "/data/oper_latest.enc",
     large: "/data/fnv3_large_latest.enc",
+    wnv3Paired: "/data/wnv3_paired_latest.enc",
     fnv3p2Paired: "/data/fnv3p2_paired_latest.enc",
     fnv3p1Paired: "/data/fnv3p1_paired_latest.enc",
-    operPaired: "/data/oper_paired_latest.enc",
     largePaired: "/data/fnv3_large_paired_latest.enc",
     ifs: "/data/ifs_tc_latest.enc",
     aifs: "/data/aifs_tc_latest.enc",
@@ -605,13 +605,13 @@ function groupAndClusterTracks(basinFiltered, numMembers, datasetName) {
         clustersByLabel[label].push(i);
     }
 
-    // Map dataset name to its corresponding member limit
     const getDatasetLimit = (dsName) => {
         if (!dsName) return 50;
         const ds = dsName.toLowerCase();
         if (ds === "large") return 1000;
-        if (ds === "aigefs") return 31;
+        if (ds === "wnv3") return 64;
         if (ds === "ifs" || ds === "aifs") return 51;
+        if (ds === "aigefs") return 31;
         if (ds === "fnv3p2" || ds === "fnv3p1" || ds === "oper" || ds === "base") return 50;
         return 50;
     };
@@ -1038,8 +1038,8 @@ export default function SpaghettiPlot() {
             setViewMode("tracker");
         }
 
-        if (datasetParam === "base" || datasetParam === "fnv3p2" || datasetParam === "fnv3p1" || datasetParam === "oper" || datasetParam === "large" || datasetParam === "ifs" || datasetParam === "aifs" || datasetParam === "aigefs") {
-            setDataset(datasetParam === "base" ? "fnv3p2" : datasetParam);
+        if (datasetParam === "base" || datasetParam === "wnv3" || datasetParam === "fnv3p2" || datasetParam === "fnv3p1" || datasetParam === "oper" || datasetParam === "large" || datasetParam === "ifs" || datasetParam === "aifs" || datasetParam === "aigefs") {
+            setDataset(datasetParam === "base" ? "fnv3p2" : datasetParam === "oper" ? "wnv3" : datasetParam);
         }
 
         if (horizonParam === "5day" || horizonParam === "15day") {
@@ -1759,6 +1759,8 @@ export default function SpaghettiPlot() {
 
         let labelStr = "WNC Base";
         if (isLarge) labelStr = "WNC Large Ens";
+        if (dataset === "wnv3") labelStr = "WNCv3";
+        if (dataset === "fnv3p1") labelStr = "WNCP1";
         if (dataset === "ifs") labelStr = "ECMWF IFS Ens";
         if (dataset === "aifs") labelStr = "ECMWF AIFS Ens";
         if (dataset === "aigefs") labelStr = "AI-GEFS Ens";
@@ -2785,7 +2787,7 @@ export default function SpaghettiPlot() {
             const url = canvas.toDataURL("image/png");
             const a = document.createElement('a');
             a.href = url;
-            const modelPrefix = dataset === 'ifs' ? 'ECMWF' : dataset === 'aifs' ? 'ECMWF-AIFS' : dataset === 'aigefs' ? 'NOAA-AIGEFS' : dataset === 'large' ? 'GDM-WNC-Large' : dataset === 'fnv3p2' ? 'GDM-WNC-Base' : dataset === 'fnv3p1' ? 'GDM-WNCP1' : dataset === 'oper' ? 'GDM-OPER' : 'GDM-WNC';
+            const modelPrefix = dataset === 'ifs' ? 'ECMWF' : dataset === 'aifs' ? 'ECMWF-AIFS' : dataset === 'aigefs' ? 'NOAA-AIGEFS' : dataset === 'large' ? 'GDM-WNC-Large' : dataset === 'fnv3p2' ? 'GDM-WNC-Base' : dataset === 'fnv3p1' ? 'GDM-WNCP1' : dataset === 'wnv3' ? 'GDM-WNCv3' : 'GDM-WNC';
             a.download = `${modelPrefix}-Snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
             a.click();
         } catch (err) {
@@ -2841,7 +2843,7 @@ export default function SpaghettiPlot() {
         try {
             if (!exportWrapperRef.current) throw new Error("No map wrapper found for capture.");
 
-            const modelPrefix = dataset === 'ifs' ? 'ECMWF' : dataset === 'aifs' ? 'ECMWF-AIFS' : dataset === 'aigefs' ? 'NOAA-AIGEFS' : dataset === 'large' ? 'GDM-WNC-Large' : dataset === 'fnv3p2' ? 'GDM-WNC-Base' : dataset === 'fnv3p1' ? 'GDM-WNCP1' : dataset === 'oper' ? 'GDM-OPER' : 'GDM-WNC';
+            const modelPrefix = dataset === 'ifs' ? 'ECMWF' : dataset === 'aifs' ? 'ECMWF-AIFS' : dataset === 'aigefs' ? 'NOAA-AIGEFS' : dataset === 'large' ? 'GDM-WNC-Large' : dataset === 'fnv3p2' ? 'GDM-WNC-Base' : dataset === 'fnv3p1' ? 'GDM-WNCP1' : dataset === 'wnv3' ? 'GDM-WNCv3' : 'GDM-WNC';
             let exportFilename = `${modelPrefix}-Ensemble-${new Date().toISOString().replace(/[:.]/g, '-')}.gif`;
             for (let h = 0; h <= maxAnimHour; h += 6) {
                 setAnimHour(h);
@@ -3143,9 +3145,9 @@ export default function SpaghettiPlot() {
                     Dataset
                 </h2>
                 <div className="segmented-control">
-                    {[{ id: "fnv3p2", label: "WNC Base" },
+                    {[{ id: "wnv3", label: "WNCv3" },
+                    { id: "fnv3p2", label: "WNC Base" },
                     { id: "fnv3p1", label: "WNCP1" },
-                    { id: "oper", label: "OPER" },
                     { id: "large", label: "WNC Large" },
                     { id: "ifs", label: "ECMWF IFS" },
                     { id: "aifs", label: "ECMWF AIFS" },
@@ -3398,7 +3400,7 @@ export default function SpaghettiPlot() {
             <div className="spaghetti-footer">
                 <p className="spaghetti-footer-text">
                     Powered by <strong className="spaghetti-footer-highlight">Calauan Weather</strong><br />
-                    Data: {dataset === "ifs" ? "ECMWF IFS Ensemble" : dataset === "aifs" ? "ECMWF AIFS Ensemble" : dataset === "aigefs" ? "AI-GEFS Ensemble" : dataset === "large" ? "WNC Large Ensemble" : dataset === "fnv3p2" ? "GDM WNC Base (WNCP2)" : dataset === "fnv3p1" ? "GDM WNCP1" : dataset === "oper" ? "GDM OPER" : "GDM WNC"}<br />
+                    Data: {dataset === "ifs" ? "ECMWF IFS Ensemble" : dataset === "aifs" ? "ECMWF AIFS Ensemble" : dataset === "aigefs" ? "AI-GEFS Ensemble" : dataset === "large" ? "WNC Large Ensemble" : dataset === "fnv3p2" ? "GDM WNC Base (WNCP2)" : dataset === "fnv3p1" ? "GDM WNCP1" : dataset === "wnv3" ? "GDM WNCv3" : "GDM WNC"}<br />
                     Consult official agencies for guidance.
                 </p>
             </div>
@@ -3450,7 +3452,7 @@ export default function SpaghettiPlot() {
                         <span>Controls</span>
                     </button>
                     <span className="mobile-title">
-                        {dataset === "ifs" ? "ECMWF IFS" : dataset === "aifs" ? "ECMWF AIFS" : dataset === "aigefs" ? "NOAA AI-GEFS" : dataset === "large" ? "GDM WNC Large" : dataset === "fnv3p2" ? "GDM WNC Base" : dataset === "fnv3p1" ? "GDM WNCP1" : dataset === "oper" ? "GDM OPER" : "GDM WNC"} · {horizon === "5day" ? "5-Day" : "15-Day"}
+                        {dataset === "ifs" ? "ECMWF IFS" : dataset === "aifs" ? "ECMWF AIFS" : dataset === "aigefs" ? "NOAA AI-GEFS" : dataset === "large" ? "GDM WNC Large" : dataset === "fnv3p2" ? "GDM WNC Base" : dataset === "fnv3p1" ? "GDM WNCP1" : dataset === "wnv3" ? "GDM WNCv3" : "GDM WNC"} · {horizon === "5day" ? "5-Day" : "15-Day"}
                     </span>
                 </div>
 
@@ -3936,7 +3938,7 @@ export default function SpaghettiPlot() {
                     {(viewMode === "animation" || (isExporting && viewMode !== "trends")) && (
                         <div className="gif-watermark">
                             <h3 className="gif-watermark-title">
-                                {dataset === 'ifs' ? 'ECMWF IFS Ensemble Track' : dataset === 'aifs' ? 'ECMWF AIFS Ensemble Track' : dataset === 'aigefs' ? 'AI-GEFS Ensemble Track' : dataset === 'large' ? 'Google Deepmind WNC 1000 Ensemble Track' : dataset === 'fnv3p2' ? 'Google Deepmind WNC Base Ensemble Track' : dataset === 'fnv3p1' ? 'Google Deepmind WNCP1 Ensemble Track' : dataset === 'oper' ? 'Google Deepmind OPER Ensemble Track' : 'Google Deepmind WNC Ensemble Track'}
+                                {dataset === 'ifs' ? 'ECMWF IFS Ensemble Track' : dataset === 'aifs' ? 'ECMWF AIFS Ensemble Track' : dataset === 'aigefs' ? 'AI-GEFS Ensemble Track' : dataset === 'large' ? 'Google Deepmind WNC 1000 Ensemble Track' : dataset === 'fnv3p2' ? 'Google Deepmind WNC Base Ensemble Track' : dataset === 'fnv3p1' ? 'Google Deepmind WNCP1 Ensemble Track' : dataset === 'wnv3' ? 'Google Deepmind WNCv3 Ensemble Track' : 'Google Deepmind WNC Ensemble Track'}
                             </h3>
                             <div className="gif-watermark-row">
                                 <strong>Init:</strong> {runInitDate ? runInitDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC' : 'Loading...'}
