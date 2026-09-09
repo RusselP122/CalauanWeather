@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import { CloudSun, Navigation, Activity, Menu, X } from 'lucide-react';
 import './Navbar.css';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);

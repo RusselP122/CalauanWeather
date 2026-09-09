@@ -36,11 +36,14 @@ def get_latest_run_datetime():
 
     raise RuntimeError("No available cyclogenesis runs found in the last 4 days.")
 
+from obfuscate_data import prune_csv_bytes
+
 def obfuscate_and_save(input_path, output_path):
     XOR_KEY = "CalauanWeather2026"
     try:
         with open(input_path, 'rb') as f:
             content_bytes = f.read()
+        content_bytes = prune_csv_bytes(content_bytes)
         key_bytes = XOR_KEY.encode('utf-8')
         xored = bytearray(len(content_bytes))
         for i in range(len(content_bytes)):
@@ -135,16 +138,26 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
         print(f"Warning: Failed to download paired CSV for {model} from {paired_url}: {e}")
         paired_local_csv = None
 
-    # Filter for 15-day forecast (lead_time_hours <= 360)
-    wp_data = data[data['lead_time_hours'] <= 360].copy()
+    # Generate both 15-day and 5-day forecast plots in a single pass
+    plot_cyclone_forecast(data, paired_local_csv, model, date_str, hour_str, horizon_days=15)
+    plot_cyclone_forecast(data, paired_local_csv, model, date_str, hour_str, horizon_days=5)
+
+def plot_cyclone_forecast(data, paired_local_csv, model, date_str, hour_str, horizon_days=15):
+    max_lead_hours = horizon_days * 24
+    plotted_tracks = 0
+    skipped_tracks = 0
+    skipped_details = []
+
+    # Filter for forecast horizon (lead_time_hours <= max_lead_hours)
+    wp_data = data[data['lead_time_hours'] <= max_lead_hours].copy()
 
     # Get all unique track IDs
     all_track_ids = sorted(wp_data['track_id'].unique())
-    print(f"Processing all track IDs for {model}: {all_track_ids}")
+    print(f"Processing all track IDs for {model} ({horizon_days}-day): {all_track_ids}")
 
     # Check if any data remains
     if wp_data.empty:
-        print(f"Warning: No data found in the CSV file for {model} for lead_time_hours <= 360.")
+        print(f"Warning: No data found in the CSV file for {model} for lead_time_hours <= {max_lead_hours}.")
         return
 
     # Ensure data is sorted by init_time, track_id, sample, and lead_time_hours
@@ -163,7 +176,7 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
     time_label = latest_ph.strftime("%I:%M %p").lstrip("0")
     latest_runtime_text = f"{time_label} PHT, {latest_ph.strftime('%B %d, %Y')}"
     forecast_start_date_text = latest_ph.strftime("%Y-%m-%d")
-    forecast_end_date_text = (latest_ph + timedelta(days=15)).strftime("%Y-%m-%d")
+    forecast_end_date_text = (latest_ph + timedelta(days=horizon_days)).strftime("%Y-%m-%d")
 
     # Set up the figure and map projection (Dark slate theme)
     fig = plt.figure(figsize=(14, 11), facecolor='#0f172a')
@@ -213,7 +226,6 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
         130, 20, 'Philippine\nSea', fontsize=10, color='#94a3b8', weight='bold',
         transform=ccrs.PlateCarree(), ha='center', va='center', style='italic', alpha=0.6
     )
-
 
     # Add Philippine Area of Responsibility (PAR) boundary
     par_vertices = [
@@ -284,7 +296,7 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
             p_data.columns = p_data.columns.str.strip()
             if 'lead_time' in p_data.columns and 'lead_time_hours' not in p_data.columns:
                 p_data['lead_time_hours'] = pd.to_timedelta(p_data['lead_time']).dt.total_seconds() / 3600
-            p_data = p_data[p_data['lead_time_hours'] <= 360].copy()
+            p_data = p_data[p_data['lead_time_hours'] <= max_lead_hours].copy()
             
             p_data = p_data.sort_values(by=['init_time', 'track_id', 'lead_time_hours'])
             for p_track_id in p_data['track_id'].unique():
@@ -302,7 +314,7 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
         except Exception as e:
             print(f"Warning: Failed to plot paired tracks for {model}: {e}")
 
-    # Define pressure ranges with custom colors (only pressure ranges, no category labels)
+    # Define pressure ranges with custom colors
     pressure_ranges = [
         {'pressure_range': '< 920 hPa', 'color': '#FF007F'},
         {'pressure_range': '920–945 hPa', 'color': '#A83232'},
@@ -312,7 +324,6 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
         {'pressure_range': '> 1005 hPa', 'color': '#3498DB'}
     ]
 
-    # Create legend elements with only pressure ranges (Ensemble Mean Track removed as requested)
     legend_elements = [
         plt.Line2D(
             [0], [0], marker='o', color='none', markerfacecolor='none',
@@ -334,7 +345,6 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
         "FNV3P1": "GDM WNCP1"
     }.get(model, model)
 
-    # Add small legend with forecast info (Slate theme text)
     legend_text = (
         f"Runtime: {latest_runtime_text}\n"
         f"Model: {model_display}\n"
@@ -349,23 +359,22 @@ def process_and_plot(model, latest_url, date_str, hour_str, is_base_model):
     start_date = forecast_start_date_text or "Start"
     end_date = forecast_end_date_text or "End"
     ens_count = 64 if model == "WNV3" else 50
-    ax.set_title(f"{model_display} {ens_count} Ensemble 15-Day Forecast Tropical Cyclone Tracks\nWestern Pacific ({start_date} to {end_date})", fontsize=14, weight='bold', color='#f8fafc', pad=15)
+    ax.set_title(f"{model_display} {ens_count} Ensemble {horizon_days}-Day Forecast Tropical Cyclone Tracks\nWestern Pacific ({start_date} to {end_date})", fontsize=14, weight='bold', color='#f8fafc', pad=15)
 
     # Save the plot
     try:
-        init_time_str = init_times[0].replace(':', '').replace(' ', 'T') if len(init_times) > 0 else '20250621T1200'
+        init_time_str = init_times[0].replace(':', '').replace(' ', 'T') if len(init_times) > 0 else f"{date_str}T{hour_str}00"
         output_dir = "public/assets"
         os.makedirs(output_dir, exist_ok=True)
         
-        # Save model-specific plot
-        output_file_model = f"{output_dir}/tropical_cyclone_15day_forecast_{model}_{init_time_str}.png"
+        output_file_model = f"{output_dir}/tropical_cyclone_{horizon_days}day_forecast_{model}_{init_time_str}.png"
         plt.savefig(output_file_model, dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none')
-        print(f"Saved model-specific plot to {output_file_model}")
+        print(f"Saved model-specific {horizon_days}-day plot to {output_file_model}")
 
     except Exception as e:
-        print(f"Error saving plot for {model}: {str(e)}")
+        print(f"Error saving {horizon_days}-day plot for {model}: {str(e)}")
 
-    print(f"Summary for {model}: {plotted_tracks} tracks plotted, {skipped_tracks} tracks skipped.")
+    print(f"Summary for {model} ({horizon_days}-day): {plotted_tracks} tracks plotted, {skipped_tracks} tracks skipped.")
     plt.close()
 
 def main():

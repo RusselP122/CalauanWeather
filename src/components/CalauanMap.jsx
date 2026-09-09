@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { MapPin, Layers, CloudRain, Wind, Thermometer, ZoomIn, ZoomOut, RotateCcw, Compass } from 'lucide-react';
 import './CalauanMap.css';
 
@@ -207,7 +207,7 @@ const OFFICIAL_CALAUAN_BARANGAYS = [
   }
 ];
 
-const CalauanMap = ({ currentWeather, selectedDay }) => {
+const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
   const [mapOverlayMode, setMapOverlayMode] = useState('rain'); // 'rain' | 'wind' | 'overview'
   const [activeBarangay, setActiveBarangay] = useState(null);
 

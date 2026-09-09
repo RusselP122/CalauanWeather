@@ -37,15 +37,18 @@ def get_latest_valid_run():
                 continue
     raise RuntimeError("No available FNV3P2 runs found in the last 3 days.")
 
+from obfuscate_data import prune_csv_bytes
+
 def download_and_obfuscate(url, output_filename):
     out_path = os.path.join(DATA_DIR, output_filename)
     try:
         resp = requests.get(url, timeout=15)
         if resp.status_code == 200:
-            obfuscated = obfuscate_content(resp.content)
+            pruned_bytes = prune_csv_bytes(resp.content)
+            obfuscated = obfuscate_content(pruned_bytes)
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(obfuscated)
-            print(f"Downloaded and obfuscated: {output_filename} ({len(resp.content)} bytes)")
+            print(f"Downloaded, pruned, and obfuscated: {output_filename} ({len(pruned_bytes)} bytes)")
             return True
         else:
             print(f"File not found (HTTP {resp.status_code}): {url}")

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as turf from "@turf/turf";
 import html2canvas from "html2canvas";
 import GIF from "gif.js";
@@ -619,7 +619,7 @@ function groupAndClusterTracks(basinFiltered, numMembers, datasetName) {
 
     // Recursively partition any cluster that exceeds the limit
     const finalGroups = [];
-    for (const [label, trackIndices] of Object.entries(clustersByLabel)) {
+    for (const [, trackIndices] of Object.entries(clustersByLabel)) {
         if (trackIndices.length > limit) {
             const splitGroups = splitClusterKMedoids(trackIndices, distanceMatrix, limit);
             finalGroups.push(...splitGroups);
@@ -1005,7 +1005,6 @@ export default function SpaghettiPlot() {
     const [exportProgress, setExportProgress] = useState(0);
     const [exportStatusText, setExportStatusText] = useState("");
     const [runInitDate, setRunInitDate] = useState(null);
-    const [showAnimControls, setShowAnimControls] = useState(true);
     const [showAllSystems, setShowAllSystems] = useState(false);
     const [isAigefsOutdated, setIsAigefsOutdated] = useState(false);
     const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
@@ -1059,7 +1058,7 @@ export default function SpaghettiPlot() {
                 let label = item.cycleTime;
                 const matchTime = item.cycleTime.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):00/);
                 if (matchTime) {
-                    const [_, yr, mo, dy, hr] = matchTime;
+                    const [, , mo, dy, hr] = matchTime;
                     label = `${mo}/${dy} ${hr}Z`;
                 }
 
@@ -1457,7 +1456,9 @@ export default function SpaghettiPlot() {
                                 const encPaired = await pairedRes.text();
                                 pairedCsvText = decodeObfuscatedData(encPaired);
                             }
-                        } catch (_) { }
+                        } catch (_err) {
+                            // Paired data optional for older cycles
+                        }
                     }
 
                     // Parse cycle stats without map layers rendering
@@ -1753,7 +1754,9 @@ export default function SpaghettiPlot() {
                 const now = new Date();
                 const diffHours = (now - dt) / (1000 * 60 * 60);
                 if (diffHours > 24) isOutdated = true;
-            } catch (e) { }
+            } catch (_e) {
+                // Ignore parse error
+            }
         }
         setIsAigefsOutdated(isOutdated);
 
@@ -1763,7 +1766,7 @@ export default function SpaghettiPlot() {
         if (dataset === "fnv3p1") labelStr = "WNCP1";
         if (dataset === "ifs") labelStr = "ECMWF IFS Ens";
         if (dataset === "aifs") labelStr = "ECMWF AIFS Ens";
-        if (dataset === "aigefs") labelStr = "AI-GEFS Ens";
+        if (dataset === "aigefs") labelStr = isOutdated ? "AI-GEFS Ens (Outdated)" : "AI-GEFS Ens";
         setRunLabel(`${labelStr} \u00b7 ${runInitTime}`);
         setStatusMsg("Parsing tracks…");
         const rawRows = rows.filter(r => (r.lead_time_hours !== undefined || r.lead_time !== undefined) && r.lat !== undefined);
@@ -2688,6 +2691,8 @@ export default function SpaghettiPlot() {
     // Update animation layers based on animHour
     useEffect(() => {
         if (viewMode !== "animation" || status !== "ok") return;
+        const L = window.L;
+        if (!L) return;
 
         for (const obj of animObjectsRef.current) {
             const isSelected = activeDisturbanceId === null || obj.distId === activeDisturbanceId;
@@ -3511,7 +3516,7 @@ export default function SpaghettiPlot() {
                                 if (activeIndex === -1) return null;
 
                                 // Select up to 5 points centered around the activeIndex
-                                let windowPts = [];
+                                let windowPts;
                                 if (pts.length <= 5) {
                                     windowPts = [...pts];
                                 } else {
@@ -3626,7 +3631,7 @@ export default function SpaghettiPlot() {
                                                     const latestDist = latestDetectedItem?.disturbance;
                                                     const totalEnsembleMembers = dataset === "large" ? 1000 : 50;
                                                     if (latestDist) {
-                                                        let title = "";
+                                                        let title;
                                                         if (latestDist.pairedTrackName) {
                                                             const isInvest = parseInt(latestDist.pairedTrackName) >= 90;
                                                             title = isInvest ? `Invest ${latestDist.pairedTrackName}` : `TC ${latestDist.pairedTrackName}`;
@@ -3703,7 +3708,7 @@ export default function SpaghettiPlot() {
                                             let label = item.cycleTime;
                                             const matchTime = item.cycleTime.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):00/);
                                             if (matchTime) {
-                                                const [_, yr, mo, dy, hr] = matchTime;
+                                                const [, , mo, dy, hr] = matchTime;
                                                 label = `${mo}/${dy} ${hr}Z`;
                                             }
                                             // Text color is black for the current run, dark Slate for previous runs with disturbances, and muted grey for missing runs

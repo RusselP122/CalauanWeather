@@ -2,8 +2,8 @@ name: Update FNV3 Large Ensemble Forecast Images
 
 on:
   schedule:
-    # Runs at 00:00, 06:00, 12:00, and 18:00 UTC every day
-    - cron: '0 0,6,12,18 * * *'
+    # Runs at 00:25, 06:25, 12:25, and 18:25 UTC every day (offset to prevent collision with base forecast)
+    - cron: '25 0,6,12,18 * * *'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 

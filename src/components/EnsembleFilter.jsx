@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import * as turf from '@turf/turf';
 
 // Define bounding polygons for Luzon, Visayas, and Mindanao

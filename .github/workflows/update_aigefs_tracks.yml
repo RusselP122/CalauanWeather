@@ -38,6 +38,9 @@ jobs:
         run: |
           python plot_aigefs_tracks.py
 
+      - name: Obfuscate CSV Files
+        run: python obfuscate_data.py
+
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
@@ -45,7 +48,6 @@ jobs:
           
           # Stage the generated files
           git add -f public/data/aigefs_tc_latest.enc || true
-          git add -f public/data/aigefs_tc_latest.csv || true
           git add public/assets/aigefs_tropical_cyclone_* || true
           
           # Only commit if there are changes

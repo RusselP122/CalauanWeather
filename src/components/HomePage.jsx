@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Sun,
   CloudSun,
@@ -10,18 +10,10 @@ import {
   Droplets,
   Gauge,
   Thermometer,
-  Eye,
   Sunrise,
   Sunset,
-  Clock,
-  Calendar,
   AlertTriangle,
-  Info,
-  CheckCircle,
-  TrendingUp,
-  MapPin,
-  Compass,
-  ChevronRight
+  MapPin
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -182,7 +174,7 @@ const HomePage = () => {
         setWeatherData(data);
         setLastUpdated(new Date());
         setLoading(false);
-      } catch (fallbackErr) {
+      } catch (_fallbackErr) {
         if (!isBackground) {
           setError('Unable to fetch live WeatherNext 2 data. Please check connection.');
         }
@@ -363,7 +355,7 @@ const HomePage = () => {
             <AlertTriangle size={36} color="#ef4444" />
             <h3>Data Connection Error</h3>
             <p>{error}</p>
-            <button className="retry-btn" onClick={fetchEcmwfData}>Retry Sync</button>
+            <button className="retry-btn" onClick={() => fetchWeatherNextData()}>Retry Sync</button>
           </div>
         ) : (
           <>
@@ -691,7 +683,7 @@ const HomePage = () => {
             <section className="timeline-slider-section">
               <h4 className="slider-title">24-Hour Timeline Stream ({selectedDay.dayName})</h4>
               <div className="timeline-track-container">
-                {hourlyChartData.map((hour, idx) => {
+                {hourlyChartData.map((hour) => {
                   const details = getWeatherDetails(hour.weatherCode);
                   const IconComp = details.icon;
 

@@ -1,5 +1,4 @@
-// src/components/Forecast.jsx
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import Navbar from "./Navbar";
@@ -334,7 +333,6 @@ const Forecast = () => {
   const touchSwipeStartRef = useRef(null);
 
   const canvasRef = useRef(null);
-  const latestKnownRef = useRef(null);
 
   const [showTrends, setShowTrends] = useState(false);
   const [trendsManifest, setTrendsManifest] = useState(null);
@@ -546,6 +544,15 @@ const Forecast = () => {
     setPanY(0);
   };
 
+  // Close Lightbox Canvas
+  const closeLightbox = useCallback(() => {
+    setLightboxData(null);
+    setLightboxIndex(null);
+    setZoomScale(1);
+    setPanX(0);
+    setPanY(0);
+  }, []);
+
   // Touch Swipe navigation handlers for Lightbox modal
   const handleLightboxTouchStart = (e) => {
     if (e.touches && e.touches.length === 1) {
@@ -578,7 +585,7 @@ const Forecast = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [lightboxData, lightboxIndex, availableGridItems]);
+  }, [lightboxData, lightboxIndex, availableGridItems, closeLightbox]);
 
   const hasDataForCycle = (cycleTime) => {
     if (isCompareGrid) {
@@ -593,15 +600,6 @@ const Forecast = () => {
   // Accordion Expand/Collapse Toggle
   const toggleSpecsAccordion = (id) => {
     setExpandedSpecs((prev) => (prev === id ? null : id));
-  };
-
-  // Close Lightbox Canvas
-  const closeLightbox = () => {
-    setLightboxData(null);
-    setLightboxIndex(null);
-    setZoomScale(1);
-    setPanX(0);
-    setPanY(0);
   };
 
   // Drag coordinates calculations
