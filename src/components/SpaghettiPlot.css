@@ -1137,6 +1137,60 @@
   touch-action: manipulation;
 }
 
+/* Leaflet attribution & Maptoolkit logo styling */
+.leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.8) !important;
+  color: #94a3b8 !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+.leaflet-control-attribution a {
+  color: #38bdf8 !important;
+  text-decoration: none;
+}
+
+.leaflet-control-attribution a:hover {
+  text-decoration: underline;
+}
+
+.maptoolkit-logo-control {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1000;
+}
+
+.maptoolkit-logo-control:hover {
+  opacity: 0.95;
+  transform: scale(1.02);
+}
+
+/* MapLibre GL vector layer under Leaflet overlay */
+.maplibre-gl-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.maplibre-gl-layer .maplibregl-canvas-container,
+.maplibre-gl-layer .maplibregl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+}
+
+
+
 /* Desktop Sidebar Toggle */
 .desktop-sidebar-close-btn {
   display: none;

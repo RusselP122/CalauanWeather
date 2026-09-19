@@ -209,6 +209,59 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Timeline Scrubber Preview Banner */
+.preview-hour-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(2, 132, 199, 0.3) 100%);
+  border: 1px solid rgba(0, 212, 255, 0.45);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  margin-bottom: 0.85rem;
+  animation: slide-down 0.25s ease-out;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.preview-text-group {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: #f1f5f9;
+}
+
+.preview-eye-icon {
+  color: #00d4ff;
+  animation: pulse-glow 1.5s infinite alternate;
+}
+
+.exit-preview-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(0, 212, 255, 0.25);
+  border: 1px solid #00d4ff;
+  color: #ffffff;
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.exit-preview-btn:hover {
+  background: #00d4ff;
+  color: #050b14;
 }
 
 .location-pill {
@@ -218,6 +271,34 @@
   font-size: 0.82rem;
   font-weight: 600;
   color: #94a3b8;
+}
+
+.focused-barangay-pill {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.55rem;
+  color: #fbbf24;
+}
+
+.reset-barangay-btn {
+  background: rgba(245, 158, 11, 0.25);
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin-left: 0.35rem;
+  transition: all 0.2s ease;
+}
+
+.reset-barangay-btn:hover {
+  background: #f59e0b;
+  color: #000;
 }
 
 .live-status-tag {
@@ -401,36 +482,111 @@
 /* ==========================================================================
    3. Agricultural Advisory Banner
    ========================================================================== */
+/* ==========================================================================
+   3. Agricultural Advisory Banner 2.0
+   ========================================================================== */
 .agricultural-advisory-banner {
   display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  background: rgba(13, 24, 42, 0.8);
-  border: 1px solid rgba(234, 179, 8, 0.3);
-  border-radius: 1rem;
-  padding: 1rem 1.35rem;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  flex-direction: column;
+  gap: 0.85rem;
+  background: rgba(13, 24, 42, 0.85);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 1.15rem;
+  padding: 1.15rem 1.35rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.advisory-main-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
 }
 
 .advisory-icon-wrapper {
-  padding: 0.5rem;
-  background: rgba(234, 179, 8, 0.15);
-  border-radius: 0.65rem;
-  color: #eab308;
+  width: 42px;
+  height: 42px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 0.75rem;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
 .advisory-title {
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 800;
-  color: #fef08a;
+  color: #ffffff;
+  letter-spacing: -0.01em;
 }
 
-.advisory-text {
-  font-size: 0.84rem;
+.advisory-subtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.agricultural-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.agri-card {
+  background: rgba(8, 15, 29, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: all 0.2s ease;
+}
+
+.agri-card:hover {
+  border-color: rgba(0, 212, 255, 0.3);
+  background: rgba(8, 15, 29, 0.9);
+  transform: translateY(-2px);
+}
+
+.agri-card-header {
+  display: flex;
+  align-items: center;
+}
+
+.agri-card-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  letter-spacing: 0.3px;
+}
+
+.agri-card-tag.pineapple {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.agri-card-tag.spray {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.agri-card-tag.labor {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.agri-card-text {
+  font-size: 0.78rem;
   color: #cbd5e1;
-  margin-top: 4px;
   line-height: 1.45;
 }
 
@@ -680,10 +836,44 @@
   gap: 0.75rem;
 }
 
+.timeline-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .slider-title {
   font-size: 0.95rem;
   font-weight: 800;
   color: #f8fafc;
+}
+
+.slider-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.reset-preview-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reset-preview-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ffffff;
 }
 
 .timeline-track-container {
@@ -705,7 +895,7 @@
 }
 
 .timeline-hour-card {
-  min-width: 85px;
+  min-width: 88px;
   background: var(--bg-panel);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 0.85rem;
@@ -713,14 +903,53 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-shrink: 0;
-  transition: transform 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .timeline-hour-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(0, 212, 255, 0.3);
+  transform: translateY(-3px);
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(13, 24, 42, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.timeline-hour-card.is-now-card {
+  border-color: #00d4ff;
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.15) 0%, rgba(13, 24, 42, 0.7) 100%);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.25);
+}
+
+.timeline-hour-card.is-preview-active {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.2) 0%, rgba(13, 24, 42, 0.8) 100%);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+  transform: translateY(-3px);
+}
+
+.now-indicator-tag {
+  font-size: 0.58rem;
+  font-weight: 900;
+  color: #050b14;
+  background: #00d4ff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+}
+
+.preview-indicator-tag {
+  font-size: 0.58rem;
+  font-weight: 900;
+  color: #050b14;
+  background: #f59e0b;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
 }
 
 .hour-time {
@@ -1072,6 +1301,11 @@
     padding: 0.85rem;
     width: 100%;
     max-width: 100%;
+  }
+
+  .agricultural-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
   }
 }
 

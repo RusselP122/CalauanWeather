@@ -1,5 +1,19 @@
-import { useState, useMemo, useRef } from 'react';
-import { MapPin, Layers, CloudRain, Wind, Thermometer, ZoomIn, ZoomOut, RotateCcw, Compass } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import {
+  MapPin,
+  Layers,
+  CloudRain,
+  Wind,
+  Thermometer,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Compass,
+  Maximize2,
+  Minimize2,
+  Search,
+  Check
+} from 'lucide-react';
 import './CalauanMap.css';
 
 // Official Calauan Municipal Outer Boundary (OpenStreetMap GeoJSON)
@@ -207,9 +221,16 @@ const OFFICIAL_CALAUAN_BARANGAYS = [
   }
 ];
 
-const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
-  const [mapOverlayMode, setMapOverlayMode] = useState('rain'); // 'rain' | 'wind' | 'overview'
+const CalauanMap = ({
+  selectedDay,
+  currentWeather: _currentWeather,
+  previewHour = null,
+  focusedBarangay = null,
+  onFocusBarangay = null
+}) => {
+  const [mapOverlayMode, setMapOverlayMode] = useState('rain'); // 'rain' | 'wind' | 'temp' | 'overview'
   const [activeBarangay, setActiveBarangay] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Zoom & Pan Interactive State
   const [zoomScale, setZoomScale] = useState(1);
@@ -217,6 +238,24 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const mapContainerRef = useRef(null);
+
+  // Sync active barangay if focusedBarangay prop changes externally
+  useEffect(() => {
+    if (focusedBarangay) {
+      setActiveBarangay(focusedBarangay);
+    }
+  }, [focusedBarangay]);
+
+  // Handle ESC key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Zoom Controls Handlers
   const handleZoomIn = () => setZoomScale((prev) => Math.min(prev + 0.35, 4.0));
@@ -243,18 +282,17 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
 
   const handleMouseUp = () => setIsDragging(false);
 
-  // Base weather values derived from Open-Meteo current forecast
-  const rawRain = selectedDay?.precipSum;
+  // Base weather values derived from active preview hour or selected day forecast
+  const rawRain = previewHour?.precip ?? selectedDay?.precipSum;
   const baseRain = typeof rawRain === 'number' ? rawRain : (parseFloat(rawRain) || 0.0);
 
-  const rawWind = selectedDay?.windMax;
+  const rawWind = previewHour?.windSpeed ?? selectedDay?.windMax;
   const baseWind = Math.round(typeof rawWind === 'number' ? rawWind : (parseFloat(rawWind) || 5.0));
 
-  // Base wind direction from forecast
-  const baseWindDirDeg = selectedDay?.windDirDeg ?? 315;
+  const baseWindDirDeg = previewHour?.windDirDeg ?? selectedDay?.windDirDeg ?? 90;
 
-  const rawTemp = selectedDay?.tempMax;
-  const baseTempMax = Math.round(typeof rawTemp === 'number' ? rawTemp : (parseFloat(rawTemp) || 30.0));
+  const rawTemp = previewHour?.temp ?? selectedDay?.tempMax;
+  const baseTemp = Math.round(typeof rawTemp === 'number' ? rawTemp : (parseFloat(rawTemp) || 30.0));
 
   // Calculate live barangay weather metrics
   const barangayWeatherData = useMemo(() => {
@@ -266,11 +304,12 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
       const rainMm = (baseRain * rFactor).toFixed(1);
       const windKmh = Math.round(baseWind * wFactor);
 
-      // Temperature variation based on elevation
-      const tempDelta = (1.0 - eFactor) * 1.5;
-      const tempC = (baseTempMax + tempDelta).toFixed(1);
+      // Temperature variation based on elevation and local topography
+      const tempDelta = (1.0 - eFactor) * 1.8;
+      const tempC = (baseTemp + tempDelta).toFixed(1);
+      const apparentC = (parseFloat(tempC) + (eFactor < 1.0 ? 3.0 : 1.2)).toFixed(1);
 
-      // Compass direction from forecast wind direction
+      // Compass cardinal direction
       const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
       const windDirStr = directions[Math.round(baseWindDirDeg / 22.5) % 16];
 
@@ -279,44 +318,121 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
         rainMm,
         windKmh,
         tempC,
+        apparentC,
         windDirStr
       };
     });
-  }, [baseRain, baseWind, baseTempMax, baseWindDirDeg]);
+  }, [baseRain, baseWind, baseTemp, baseWindDirDeg]);
+
+  // Dynamic Choropleth Fill Calculator
+  const getChoroplethFill = (b, mode) => {
+    if (mode === 'rain') {
+      const r = parseFloat(b.rainMm);
+      if (r <= 0.0) return 'rgba(15, 23, 42, 0.72)';
+      if (r < 2.5) return 'rgba(6, 182, 212, 0.45)';
+      if (r < 7.5) return 'rgba(14, 165, 233, 0.58)';
+      if (r < 15.0) return 'rgba(16, 185, 129, 0.62)';
+      if (r < 30.0) return 'rgba(245, 158, 11, 0.72)';
+      return 'rgba(239, 68, 68, 0.82)';
+    }
+    if (mode === 'wind') {
+      const w = b.windKmh;
+      if (w < 12) return 'rgba(16, 185, 129, 0.42)';
+      if (w < 25) return 'rgba(14, 165, 233, 0.52)';
+      if (w < 38) return 'rgba(245, 158, 11, 0.65)';
+      if (w < 50) return 'rgba(249, 115, 22, 0.75)';
+      return 'rgba(239, 68, 68, 0.85)';
+    }
+    if (mode === 'temp') {
+      const t = parseFloat(b.tempC);
+      if (t < 26) return 'rgba(56, 189, 248, 0.45)';
+      if (t < 29) return 'rgba(16, 185, 129, 0.5)';
+      if (t < 32) return 'rgba(234, 179, 8, 0.6)';
+      if (t < 35) return 'rgba(249, 115, 22, 0.7)';
+      return 'rgba(239, 68, 68, 0.82)';
+    }
+    return 'rgba(30, 58, 105, 0.65)';
+  };
 
   return (
-    <div className="calauan-map-card">
+    <div className={`calauan-map-card ${isFullscreen ? 'is-fullscreen' : ''}`}>
       <div className="map-card-header">
         <div className="map-title-box">
           <MapPin className="map-icon" size={20} />
           <div>
             <h3 className="map-title">Calauan Official Barangay Weather Map</h3>
-            <span className="map-subtitle">GADM Level 3 Official Subdivisions • ECMWF High-Resolution Spatial Grid</span>
+            <span className="map-subtitle">
+              GADM Level 3 Subdivisions • High-Resolution Spatial Grid
+              {previewHour ? ` • [Preview: ${previewHour.time}]` : ''}
+            </span>
           </div>
         </div>
 
-        {/* Overlay Mode Switcher */}
-        <div className="map-mode-tabs">
+        {/* Header Right Actions: Search + Modes + Fullscreen */}
+        <div className="map-header-actions">
+          {/* Quick Barangay Selector */}
+          <div className="map-search-select-wrapper">
+            <Search size={13} className="search-select-icon" />
+            <select
+              className="barangay-quick-select"
+              value={activeBarangay?.id || ''}
+              onChange={(e) => {
+                const found = barangayWeatherData.find((b) => b.id === e.target.value);
+                setActiveBarangay(found || null);
+              }}
+            >
+              <option value="">Jump to Barangay (18)...</option>
+              {barangayWeatherData.map((b) => (
+                <option key={b.id} value={b.id}>
+                  Brgy. {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Overlay Mode Switcher */}
+          <div className="map-mode-tabs">
+            <button
+              className={`mode-tab ${mapOverlayMode === 'rain' ? 'active' : ''}`}
+              onClick={() => setMapOverlayMode('rain')}
+              title="Rainfall Overlay"
+            >
+              <CloudRain size={14} />
+              <span>Rainfall</span>
+            </button>
+            <button
+              className={`mode-tab ${mapOverlayMode === 'wind' ? 'active' : ''}`}
+              onClick={() => setMapOverlayMode('wind')}
+              title="Wind Corridor Overlay"
+            >
+              <Wind size={14} />
+              <span>Wind</span>
+            </button>
+            <button
+              className={`mode-tab ${mapOverlayMode === 'temp' ? 'active' : ''}`}
+              onClick={() => setMapOverlayMode('temp')}
+              title="Temperature Variation"
+            >
+              <Thermometer size={14} />
+              <span>Temp</span>
+            </button>
+            <button
+              className={`mode-tab ${mapOverlayMode === 'overview' ? 'active' : ''}`}
+              onClick={() => setMapOverlayMode('overview')}
+              title="Overview Map"
+            >
+              <Layers size={14} />
+              <span>Overview</span>
+            </button>
+          </div>
+
+          {/* Fullscreen Expand Toggle */}
           <button
-            className={`mode-tab ${mapOverlayMode === 'rain' ? 'active' : ''}`}
-            onClick={() => setMapOverlayMode('rain')}
+            className="fullscreen-toggle-btn"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Expand Map Theater Mode'}
           >
-            <CloudRain size={14} />
-            <span>Rainfall</span>
-          </button>
-          <button
-            className={`mode-tab ${mapOverlayMode === 'wind' ? 'active' : ''}`}
-            onClick={() => setMapOverlayMode('wind')}
-          >
-            <Wind size={14} />
-            <span>Wind Corridor</span>
-          </button>
-          <button
-            className={`mode-tab ${mapOverlayMode === 'overview' ? 'active' : ''}`}
-            onClick={() => setMapOverlayMode('overview')}
-          >
-            <Layers size={14} />
-            <span>Overview</span>
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
         </div>
       </div>
@@ -366,8 +482,22 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
             transform={`translate(${pan.x}, ${pan.y}) scale(${zoomScale})`}
             style={{ transformOrigin: '275px 325px', transition: isDragging ? 'none' : 'transform 0.15s ease-out' }}
           >
-            {/* Grid Lines */}
-            <g className="map-grid-lines" opacity="0.12">
+            {/* Geographic Landmark Watermarks */}
+            <g className="map-landmarks" opacity="0.35" pointerEvents="none">
+              {/* North Water Boundary: Laguna de Bay */}
+              <text x="360" y="45" fill="#38bdf8" fontSize="10" fontWeight="700" letterSpacing="2">
+                ≈ LAGUNA DE BAY SHORELINE (NORTH) ≈
+              </text>
+              <path d="M 230,35 Q 310,25 380,35 T 500,35" fill="none" stroke="#38bdf8" strokeWidth="1.2" strokeDasharray="4 4" />
+
+              {/* South Boundary: Mt. Kalisungan & Mt. Imok */}
+              <text x="275" y="640" textAnchor="middle" fill="#10b981" fontSize="9.5" fontWeight="700" letterSpacing="1.5">
+                ▲ MT. KALISUNGAN & MT. IMOK FOOTHILLS (SOUTH) ▲
+              </text>
+            </g>
+
+            {/* Grid Reference Lines */}
+            <g className="map-grid-lines" opacity="0.1">
               {[100, 200, 300, 400, 500, 600].map((line) => (
                 <line key={`h-${line}`} x1="0" y1={line} x2="550" y2={line} stroke="#00d4ff" strokeWidth="1" strokeDasharray="4 4" />
               ))}
@@ -379,34 +509,38 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
             {/* Main Outer Municipal Boundary Glow & Fill */}
             <path
               d={OUTER_MUNICIPAL_PATH}
-              fill="url(#calauanGradient)"
+              fill="none"
               stroke="#00d4ff"
               strokeWidth="2.5"
               filter="url(#glow)"
               opacity="0.85"
             />
 
-            {/* Render Official Barangay Sector Polygons with Borders */}
+            {/* Render Official Barangay Sector Polygons with Dynamic Choropleth Fills */}
             {barangayWeatherData.map((b) => {
               const isActive = activeBarangay?.id === b.id;
+              const isFocused = focusedBarangay?.id === b.id;
+              const polyFill = getChoroplethFill(b, mapOverlayMode);
+
               return (
                 <g key={`poly-group-${b.id}`}>
                   <path
                     d={b.path}
-                    className={`barangay-official-polygon ${isActive ? 'active' : ''}`}
+                    fill={polyFill}
+                    className={`barangay-official-polygon ${isActive ? 'active' : ''} ${isFocused ? 'focused' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveBarangay(b);
                     }}
                     onMouseEnter={() => setActiveBarangay(b)}
                   >
-                    <title>Brgy. {b.name}</title>
+                    <title>Brgy. {b.name} ({b.type})</title>
                   </path>
                   {/* Barangay Name Label inside Polygon */}
                   <text
                     x={b.cx}
                     y={b.cy - 8}
-                    className={`barangay-map-label ${isActive ? 'active' : ''}`}
+                    className={`barangay-map-label ${isActive ? 'active' : ''} ${isFocused ? 'focused' : ''}`}
                   >
                     {b.name}
                   </text>
@@ -414,13 +548,16 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
               );
             })}
 
-            {/* Barangay Interactive Weather Badges & Nodes */}
+            {/* Barangay Interactive Weather Badges, Nodes & Wind Arrows */}
             {barangayWeatherData.map((b) => {
               const isActive = activeBarangay?.id === b.id;
+              const isFocused = focusedBarangay?.id === b.id;
+              const windFlowAngle = (baseWindDirDeg + 180) % 360; // Arrow points where wind flows towards
+
               return (
                 <g
                   key={b.id}
-                  className={`barangay-node-group ${isActive ? 'active' : ''}`}
+                  className={`barangay-node-group ${isActive ? 'active' : ''} ${isFocused ? 'focused' : ''}`}
                   transform={`translate(${b.cx}, ${b.cy})`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -430,10 +567,14 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
                 >
                   {/* Invisible Hit Radius */}
                   <circle r="18" fill="transparent" pointerEvents="all" />
-                  {/* Static Node Dot */}
-                  <circle r="4" fill={mapOverlayMode === 'rain' ? '#38bdf8' : mapOverlayMode === 'wind' ? '#10b981' : '#00d4ff'} />
 
-                  {/* Badge Content depending on mode */}
+                  {/* Static Node Dot */}
+                  <circle
+                    r={isFocused ? 5 : 4}
+                    fill={isFocused ? '#f59e0b' : mapOverlayMode === 'rain' ? '#38bdf8' : mapOverlayMode === 'wind' ? '#10b981' : mapOverlayMode === 'temp' ? '#fbbf24' : '#00d4ff'}
+                  />
+
+                  {/* Badge Content depending on active mode */}
                   {mapOverlayMode === 'rain' && (
                     <g transform="translate(0, -14)">
                       <rect x="-24" y="-12" width="48" height="18" rx="5" fill="#0369a1" stroke="#38bdf8" strokeWidth="1.2" />
@@ -445,9 +586,26 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
 
                   {mapOverlayMode === 'wind' && (
                     <g transform="translate(0, -14)">
-                      <rect x="-26" y="-12" width="52" height="18" rx="5" fill="#047857" stroke="#10b981" strokeWidth="1.2" />
+                      <rect x="-30" y="-12" width="60" height="18" rx="5" fill="#047857" stroke="#10b981" strokeWidth="1.2" />
+                      {/* Wind Flow Vector Arrow */}
+                      <g transform="translate(-18, -3)">
+                        <polygon
+                          points="0,-5 3,4 0,2 -3,4"
+                          fill="#ffffff"
+                          transform={`rotate(${windFlowAngle})`}
+                        />
+                      </g>
+                      <text x="5" y="0" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="800">
+                        {b.windKmh}kph
+                      </text>
+                    </g>
+                  )}
+
+                  {mapOverlayMode === 'temp' && (
+                    <g transform="translate(0, -14)">
+                      <rect x="-24" y="-12" width="48" height="18" rx="5" fill="#92400e" stroke="#fbbf24" strokeWidth="1.2" />
                       <text x="0" y="0" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="800">
-                        {b.windKmh} km/h
+                        {b.tempC}°C
                       </text>
                     </g>
                   )}
@@ -461,6 +619,50 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
           </g>
         </svg>
 
+        {/* Dynamic Scale Legend Bar */}
+        <div className="map-scale-legend">
+          <span className="legend-label">
+            {mapOverlayMode === 'rain' && 'Rainfall (mm)'}
+            {mapOverlayMode === 'wind' && 'Wind Speed (km/h)'}
+            {mapOverlayMode === 'temp' && 'Air Temperature (°C)'}
+            {mapOverlayMode === 'overview' && 'Calauan Municipal Sectors'}
+          </span>
+          {mapOverlayMode !== 'overview' && (
+            <div className="legend-bar-track">
+              <div className={`legend-gradient ${mapOverlayMode}`}></div>
+              <div className="legend-ticks">
+                {mapOverlayMode === 'rain' && (
+                  <>
+                    <span>0</span>
+                    <span>2.5</span>
+                    <span>7.5</span>
+                    <span>15</span>
+                    <span>30+ mm</span>
+                  </>
+                )}
+                {mapOverlayMode === 'wind' && (
+                  <>
+                    <span>0</span>
+                    <span>12</span>
+                    <span>25</span>
+                    <span>38</span>
+                    <span>50+ km/h</span>
+                  </>
+                )}
+                {mapOverlayMode === 'temp' && (
+                  <>
+                    <span>24°</span>
+                    <span>26°</span>
+                    <span>29°</span>
+                    <span>32°</span>
+                    <span>35°C+</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Compass Widget */}
         <div className="compass-widget">
           <Compass size={22} className="compass-icon" />
@@ -472,7 +674,12 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
           <div className="barangay-detail-card">
             <div className="b-card-header">
               <div>
-                <h4 className="b-name">Brgy. {activeBarangay.name}</h4>
+                <h4 className="b-name">
+                  Brgy. {activeBarangay.name}
+                  {focusedBarangay?.id === activeBarangay.id && (
+                    <span className="b-focused-badge">Currently Focused</span>
+                  )}
+                </h4>
                 <span className="b-type">{activeBarangay.type}</span>
               </div>
               <button className="b-close-btn" onClick={() => setActiveBarangay(null)}>×</button>
@@ -481,7 +688,7 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
             <div className="b-metrics-row">
               <div className="b-metric">
                 <CloudRain size={14} color="#38bdf8" />
-                <span>Rainfall: <strong>{activeBarangay.rainMm} mm</strong> (24h Total)</span>
+                <span>Rain: <strong>{activeBarangay.rainMm} mm</strong></span>
               </div>
               <div className="b-metric">
                 <Wind size={14} color="#10b981" />
@@ -489,25 +696,61 @@ const CalauanMap = ({ selectedDay, currentWeather: _currentWeather }) => {
               </div>
               <div className="b-metric">
                 <Thermometer size={14} color="#f59e0b" />
-                <span>Air Temp: <strong>{activeBarangay.tempC} °C</strong></span>
+                <span>Air: <strong>{activeBarangay.tempC}°C</strong> (Feels <strong>{activeBarangay.apparentC}°C</strong>)</span>
               </div>
             </div>
+
+            {/* Barangay Focus Button */}
+            {onFocusBarangay && (
+              <div className="b-action-row">
+                <button
+                  className={`b-focus-btn ${focusedBarangay?.id === activeBarangay.id ? 'is-focused' : ''}`}
+                  onClick={() => {
+                    if (focusedBarangay?.id === activeBarangay.id) {
+                      onFocusBarangay(null);
+                    } else {
+                      onFocusBarangay(activeBarangay);
+                    }
+                  }}
+                >
+                  {focusedBarangay?.id === activeBarangay.id ? (
+                    <>
+                      <Check size={13} />
+                      <span>Focused on Dashboard (Click to Reset)</span>
+                    </>
+                  ) : (
+                    <>
+                      <MapPin size={13} />
+                      <span>Focus Dashboard to Brgy. {activeBarangay.name}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       <div className="map-footer-info">
         <div className="info-item">
-          <span className="info-label">Boundary Layer</span>
-          <span className="info-value">GADM Level 3 Subdivisions</span>
+          <span className="info-label">Active Overlay</span>
+          <span className="info-value">
+            {mapOverlayMode === 'rain' ? 'Rainfall Distribution' :
+             mapOverlayMode === 'wind' ? 'Wind Speed & Vectors' :
+             mapOverlayMode === 'temp' ? 'Temperature Microclimate' : 'Official Sectors'}
+          </span>
         </div>
         <div className="info-item">
-          <span className="info-label">24H RAINFALL (MM)</span>
-          <span className="info-value">{baseRain.toFixed(1)} mm Avg</span>
+          <span className="info-label">Current Scale Baseline</span>
+          <span className="info-value">
+            {mapOverlayMode === 'rain' ? `${baseRain.toFixed(1)} mm Municipal Base` :
+             mapOverlayMode === 'wind' ? `${baseWind} km/h Baseline` :
+             mapOverlayMode === 'temp' ? `${baseTemp}°C Peak Base` : '18 Official Barangays'}
+          </span>
         </div>
         <div className="info-item">
-          <span className="info-label">Wind Speed</span>
-          <span className="info-value">{baseWind} km/h Peak</span>
+          <span className="info-label">Barangay Coverage</span>
+          <span className="info-value">18 Subdivisions Loaded</span>
         </div>
       </div>
     </div>

@@ -18,8 +18,8 @@ import {
 } from "recharts";
 import "./SpaghettiPlot.css";
 
-// ── Leaflet asset injection ───────────────────────────────────────────────
-const injectLeafletCSS = () => {
+// ── Map asset injection (Leaflet + MapLibre GL for Maptoolkit vector style) ──
+const injectMapAssets = () => {
     if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link");
         link.id = "leaflet-css";
@@ -27,15 +27,181 @@ const injectLeafletCSS = () => {
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(link);
     }
+    if (!document.getElementById("maplibre-css")) {
+        const link = document.createElement("link");
+        link.id = "maplibre-css";
+        link.rel = "stylesheet";
+        link.href = "https://cdn.jsdelivr.net/npm/maplibre-gl@6.9.0/dist/maplibre-gl.css";
+        document.head.appendChild(link);
+    }
 };
-const loadLeaflet = () =>
-    new Promise((resolve) => {
-        if (window.L) return resolve(window.L);
+
+const _scriptPromises = {};
+const loadScript = (src, id) => {
+    if (_scriptPromises[src]) return _scriptPromises[src];
+    if (id && document.getElementById(id)) return Promise.resolve();
+    _scriptPromises[src] = new Promise((resolve, reject) => {
         const s = document.createElement("script");
-        s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        s.onload = () => resolve(window.L);
+        if (id) s.id = id;
+        s.src = src;
+        s.async = false;
+        s.onload = () => resolve();
+        s.onerror = (err) => {
+            delete _scriptPromises[src];
+            reject(err);
+        };
         document.head.appendChild(s);
     });
+    return _scriptPromises[src];
+};
+
+const loadMapLibraries = async () => {
+    if (!window.L) {
+        await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js", "leaflet-js");
+    }
+
+    if (!window.maplibregl) {
+        const m = await import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/maplibre-gl@6.9.0/dist/maplibre-gl.mjs");
+        window.maplibregl = m.Map ? m : (m.default || m);
+    }
+
+    return { L: window.L, maplibregl: window.maplibregl };
+};
+
+// Custom Leaflet Layer for MapLibre GL: directly synchronizes Leaflet with MapLibre GL 6 without any deprecated internal methods
+const createMaplibreLayer = (L, maplibregl, options = {}) => {
+    const MaplibreGLLayer = L.Layer.extend({
+        options: {
+            style: "https://styles.maptoolkit.org/dark-en.json",
+            interactive: false,
+            preserveDrawingBuffer: true,
+            attribution:
+                "© <a href='https://www.maptoolkit.com/copyright/' target='_blank' rel='noopener noreferrer'>Maptoolkit</a> " +
+                "© <a href='https://www.openstreetmap.org/copyright' target='_blank' rel='noopener noreferrer'>OpenStreetMap</a>",
+            ...options
+        },
+
+        onAdd: function (map) {
+            this._map = map;
+            if (!this._container) {
+                const mapContainer = map.getContainer();
+                const container = L.DomUtil.create("div", "maplibre-gl-layer");
+                container.style.position = "absolute";
+                container.style.left = "0";
+                container.style.top = "0";
+                container.style.width = "100%";
+                container.style.height = "100%";
+                container.style.zIndex = "0";
+                container.style.pointerEvents = "none";
+
+                // Ensure it is placed behind Leaflet's mapPane so Leaflet overlays appear on top
+                if (mapContainer.firstChild) {
+                    mapContainer.insertBefore(container, mapContainer.firstChild);
+                } else {
+                    mapContainer.appendChild(container);
+                }
+                this._container = container;
+            }
+
+            if (!this._glMap) {
+                const center = map.getCenter();
+                const zoom = map.getZoom();
+                this._glMap = new maplibregl.Map({
+                    container: this._container,
+                    style: this.options.style,
+                    center: [center.lng, center.lat],
+                    zoom: Math.max(0, zoom - 1),
+                    interactive: false,
+                    attributionControl: false,
+                    preserveDrawingBuffer: true,
+                    renderWorldCopies: true
+                });
+
+                this._glMap.on("load", () => {
+                    this._sync();
+                });
+
+                this._glMap.on("error", (e) => {
+                    console.warn("MapLibre GL:", e?.error?.message || e);
+                });
+            }
+
+            map.on("move", this._sync, this);
+            map.on("zoom", this._sync, this);
+            map.on("zoomanim", this._zoomAnim, this);
+            map.on("resize", this._resize, this);
+
+            this._sync();
+            return this;
+        },
+
+        onRemove: function (map) {
+            map.off("move", this._sync, this);
+            map.off("zoom", this._sync, this);
+            map.off("zoomanim", this._zoomAnim, this);
+            map.off("resize", this._resize, this);
+
+            if (this._glMap) {
+                this._glMap.remove();
+                this._glMap = null;
+            }
+            if (this._container && this._container.parentNode) {
+                this._container.parentNode.removeChild(this._container);
+                this._container = null;
+            }
+            return this;
+        },
+
+        _sync: function () {
+            if (!this._glMap || !this._map) return;
+            const center = this._map.getCenter();
+            const zoom = this._map.getZoom();
+            this._glMap.jumpTo({
+                center: [center.lng, center.lat],
+                zoom: Math.max(0, zoom - 1)
+            });
+        },
+
+        _zoomAnim: function (e) {
+            if (!this._glMap || !e) return;
+            this._glMap.jumpTo({
+                center: [e.center.lng, e.center.lat],
+                zoom: Math.max(0, e.zoom - 1)
+            });
+        },
+
+        _resize: function () {
+            if (!this._glMap) return;
+            this._glMap.resize();
+            this._sync();
+        },
+
+        getGLMap: function () {
+            return this._glMap;
+        }
+    });
+
+    return new MaplibreGLLayer(options);
+};
+
+// Pre-fetch and sanitize Maptoolkit style to prevent color-relief crashes
+const loadMaptoolkitStyle = async () => {
+    try {
+        const res = await fetch("https://styles.maptoolkit.org/dark-en.json");
+        if (!res.ok) return "https://styles.maptoolkit.org/dark-en.json";
+        const style = await res.json();
+        if (style && Array.isArray(style.layers)) {
+            style.layers = style.layers.filter(l => l && l.type !== "color-relief");
+        }
+        if (style && style.sources && style.sources.bathymetry) {
+            delete style.sources.bathymetry;
+        }
+        return style;
+    } catch (err) {
+        console.warn("Could not pre-fetch Maptoolkit style, using URL directly:", err);
+        return "https://styles.maptoolkit.org/dark-en.json";
+    }
+};
 
 // ── Wind → colour (PAGASA Scale in km/h) ────────────────────
 function windColor(w) {
@@ -1239,20 +1405,33 @@ export default function SpaghettiPlot() {
     // ── Init map once ─────────────────────────────────────────────────────
     useEffect(() => {
         let cancelled = false;
-        injectLeafletCSS();
+        injectMapAssets();
 
-        // Wait for Leaflet CSS to actually load before creating the map
+        // Wait for Map CSS to load before creating the map
         const waitForCSS = () => new Promise((resolve) => {
-            const link = document.getElementById("leaflet-css");
-            if (!link) return resolve();
-            if (link.sheet) return resolve();  // already loaded
-            link.onload = resolve;
-            link.onerror = resolve;
-            // Safety timeout
-            setTimeout(resolve, 3000);
+            const lLink = document.getElementById("leaflet-css");
+            const mLink = document.getElementById("maplibre-css");
+            const isLoaded = (link) => !link || Boolean(link.sheet);
+            if (isLoaded(lLink) && isLoaded(mLink)) return resolve();
+            let resolved = false;
+            const done = () => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve();
+                }
+            };
+            setTimeout(done, 3000);
+            if (lLink && !lLink.sheet) {
+                lLink.onload = () => { if (isLoaded(mLink)) done(); };
+                lLink.onerror = done;
+            }
+            if (mLink && !mLink.sheet) {
+                mLink.onload = () => { if (isLoaded(lLink)) done(); };
+                mLink.onerror = done;
+            }
         });
 
-        waitForCSS().then(() => loadLeaflet()).then((L) => {
+        waitForCSS().then(() => Promise.all([loadMapLibraries(), loadMaptoolkitStyle()])).then(([{ L, maplibregl }, style]) => {
             if (cancelled || mapInstanceRef.current || !mapRef.current) return;
 
             // Inject map background BEFORE creating the map
@@ -1277,25 +1456,30 @@ export default function SpaghettiPlot() {
 
             L.control.zoom({ position: "bottomright" }).addTo(map);
 
-            tileLayerRef.current = L.tileLayer(
-                "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png",
-                { attribution: "© CARTO", subdomains: "abcd", maxZoom: 19, noWrap: true }
-            ).addTo(map);
+            // Maptoolkit Dark (English) vector basemap
+            tileLayerRef.current = createMaplibreLayer(L, maplibregl, {
+                style: style,
+                preserveDrawingBuffer: true
+            }).addTo(map);
+
+            // Maptoolkit Logo Control (Community License requirement)
+            const MaptoolkitLogoControl = L.Control.extend({
+                options: { position: "bottomleft" },
+                onAdd: function () {
+                    const div = L.DomUtil.create("div", "maptoolkit-logo-control");
+                    div.style.pointerEvents = "auto";
+                    div.style.margin = "0 0 6px 6px";
+                    div.innerHTML = `<a href="https://www.maptoolkit.org/" target="_blank" rel="noopener noreferrer" style="display:block;" title="Maptoolkit">
+                        <img src="https://www.maptoolkit.org/assets/maptoolkit-attribution.png" alt="Maptoolkit" style="height:24px;display:block;" />
+                    </a>`;
+                    L.DomEvent.disableClickPropagation(div);
+                    return div;
+                }
+            });
+            new MaptoolkitLogoControl().addTo(map);
 
             // PAR boundary (solid red)
             parLayerRef.current = L.polyline(PAR, { color: "#ef4444", weight: 2 }).addTo(map);
-
-            // Country boundaries GeoJSON Overlay
-            fetch("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
-                .then(r => r.ok ? r.json() : null)
-                .then(geo => {
-                    if (geo && map) {
-                        geoJsonLayerRef.current = L.geoJSON(geo, {
-                            style: { color: "rgba(255, 255, 255, 0.3)", weight: 1, opacity: 0.7, fillOpacity: 0.02 }
-                        }).addTo(map);
-                    }
-                })
-                .catch(err => { console.warn("Failed to load countries GeoJSON:", err); });
 
             gridlinesLayerRef.current = L.layerGroup().addTo(map);
 

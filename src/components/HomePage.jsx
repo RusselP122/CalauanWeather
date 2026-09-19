@@ -13,7 +13,11 @@ import {
   Sunrise,
   Sunset,
   AlertTriangle,
-  MapPin
+  MapPin,
+  RefreshCw,
+  Sprout,
+  Eye,
+  X
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -25,7 +29,8 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend
+  Legend,
+  ReferenceLine
 } from 'recharts';
 import Navbar from './Navbar';
 import CalauanMap from './CalauanMap';
@@ -132,6 +137,9 @@ const HomePage = () => {
   const [chartMetric, setChartMetric] = useState('temp'); // 'temp' | 'rain' | 'wind'
   const [currentTimeStr, setCurrentTimeStr] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [focusedBarangay, setFocusedBarangay] = useState(null);
+  const [previewHourIndex, setPreviewHourIndex] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -149,8 +157,16 @@ const HomePage = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Reset hourly preview whenever user changes the selected day
+  useEffect(() => {
+    setPreviewHourIndex(null);
+  }, [selectedDayIndex]);
+
   const fetchWeatherNextData = async (isBackground = false) => {
-    if (!isBackground) setLoading(true);
+    if (!isBackground) {
+      if (!weatherData) setLoading(true);
+      else setIsSyncing(true);
+    }
     setError(null);
     try {
       // Open-Meteo Google WeatherNext 2 Ensemble Forecast API
@@ -163,7 +179,6 @@ const HomePage = () => {
       const data = await response.json();
       setWeatherData(data);
       setLastUpdated(new Date());
-      setLoading(false);
     } catch (err) {
       console.error('Error fetching Google WeatherNext 2 forecast:', err);
       // Fallback request to seamless Open-Meteo endpoint if primary has temporary rate-limit
@@ -173,13 +188,14 @@ const HomePage = () => {
         const data = await res.json();
         setWeatherData(data);
         setLastUpdated(new Date());
-        setLoading(false);
       } catch (_fallbackErr) {
         if (!isBackground) {
           setError('Unable to fetch live WeatherNext 2 data. Please check connection.');
         }
-        setLoading(false);
       }
+    } finally {
+      setIsSyncing(false);
+      setLoading(false);
     }
   };
 
@@ -223,11 +239,24 @@ const HomePage = () => {
     });
   }, [weatherData]);
 
+  // Global Min and Max across 7-day forecast for dynamically proportioned bars
+  const { globalTempMin, globalTempMax, globalTempRange } = useMemo(() => {
+    if (!dailyList.length) return { globalTempMin: 20, globalTempMax: 35, globalTempRange: 15 };
+    const mins = dailyList.map((d) => d.tempMin);
+    const maxs = dailyList.map((d) => d.tempMax);
+    const min = Math.min(...mins);
+    const max = Math.max(...maxs);
+    return {
+      globalTempMin: min,
+      globalTempMax: max,
+      globalTempRange: Math.max(1, max - min)
+    };
+  }, [dailyList]);
+
   // Current Weather — real-time via Open-Meteo `current=` (updated every ~15 min)
   const currentWeather = useMemo(() => {
     if (!weatherData) return null;
 
-    // Prefer real-time `current` block if available
     if (weatherData.current) {
       const c = weatherData.current;
       const code = c.weather_code;
@@ -249,11 +278,10 @@ const HomePage = () => {
           : '0.0',
         details,
         code,
-        observedAt: c.time  // ISO timestamp of the observation
+        observedAt: c.time
       };
     }
 
-    // Fallback: match current hour from hourly array (for endpoints without `current`)
     if (!weatherData.hourly) return null;
     const h = weatherData.hourly;
     const now = new Date();
@@ -309,11 +337,76 @@ const HomePage = () => {
         precipProb: h.precipitation_probability?.[i] ?? calcPrecipProb(h.precipitation?.[i]),
         precip: h.precipitation?.[i] ? parseFloat(h.precipitation[i].toFixed(1)) : 0,
         windSpeed: Math.round(h.wind_speed_10m[i]),
+        windDirDeg: h.wind_direction_10m?.[i] ?? 90,
         pressure: Math.round(h.pressure_msl[i]),
         weatherCode: h.weather_code[i]
       };
     });
   }, [weatherData, selectedDayIndex, dailyList]);
+
+  // Active previewed hour object
+  const previewHour = useMemo(() => {
+    if (previewHourIndex === null || !hourlyChartData[previewHourIndex]) return null;
+    return hourlyChartData[previewHourIndex];
+  }, [previewHourIndex, hourlyChartData]);
+
+  // Current hour string matching the exact `time` format for the reference line
+  const currentMatchingTimeLabel = useMemo(() => {
+    if (selectedDayIndex !== 0 || !hourlyChartData.length) return null;
+    const now = new Date();
+    const currentIsoHour = now.toISOString().slice(0, 13);
+    const match = hourlyChartData.find((h) => h.rawTime?.startsWith(currentIsoHour));
+    return match ? match.time : null;
+  }, [selectedDayIndex, hourlyChartData]);
+
+  // Effective Hero Weather (supporting time scrubber & focused barangay microclimate)
+  const effectiveHeroWeather = useMemo(() => {
+    if (!currentWeather) return null;
+
+    let base = currentWeather;
+    if (previewHour) {
+      const details = getWeatherDetails(previewHour.weatherCode);
+      base = {
+        ...currentWeather,
+        temp: previewHour.temp,
+        apparent: previewHour.apparent,
+        precipProb: previewHour.precipProb,
+        precip: previewHour.precip,
+        pressure: previewHour.pressure,
+        windSpeed: previewHour.windSpeed,
+        windDirDeg: previewHour.windDirDeg,
+        windDirStr: getWindDirectionStr(previewHour.windDirDeg),
+        details,
+        code: previewHour.weatherCode,
+        isHourlyPreview: true,
+        previewTime: previewHour.time
+      };
+    }
+
+    if (focusedBarangay) {
+      const rFactor = focusedBarangay.rainFactor ?? 1.0;
+      const wFactor = focusedBarangay.windFactor ?? 1.0;
+      const eFactor = focusedBarangay.elevationFactor ?? 1.0;
+
+      const adjTemp = Math.round(base.temp + (1.0 - eFactor) * 1.8);
+      const adjApparent = Math.round(base.apparent + (eFactor < 1.0 ? 3.0 : 1.2));
+      const adjWind = Math.round(base.windSpeed * wFactor);
+      const adjPrecip = typeof base.precip === 'number' ? parseFloat((base.precip * rFactor).toFixed(1)) : base.precip;
+
+      return {
+        ...base,
+        temp: adjTemp,
+        apparent: adjApparent,
+        windSpeed: adjWind,
+        precip: adjPrecip,
+        isBarangayFocused: true,
+        focusedName: focusedBarangay.name,
+        focusedType: focusedBarangay.type
+      };
+    }
+
+    return base;
+  }, [currentWeather, previewHour, focusedBarangay]);
 
   // Selected Day summary
   const selectedDay = dailyList[selectedDayIndex] || dailyList[0];
@@ -333,14 +426,25 @@ const HomePage = () => {
               <h2 className="top-bar-title">Calauan Weather Dashboard</h2>
               <div className="top-bar-subtitle">
                 <span>Laguna Province (14.1492° N, 121.3152° E)</span>
+                <span className="top-bar-pill">WeatherNext 2</span>
               </div>
             </div>
           </div>
 
           <div className="top-bar-actions">
+            <button
+              className="sync-btn"
+              onClick={() => fetchWeatherNextData()}
+              disabled={isSyncing}
+              title="Refresh Live Weather Data"
+            >
+              <RefreshCw size={14} className={isSyncing ? 'spinning' : ''} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Live'}</span>
+            </button>
             <NewsNotification />
           </div>
         </div>
+
         {loading ? (
           <div className="dashboard-loading-state">
             <div className="loading-icon-wrapper">
@@ -348,7 +452,7 @@ const HomePage = () => {
               <div className="loading-spinner-ring"></div>
             </div>
             <h3 className="loading-title">LOADING PLEASE WAIT...</h3>
-            <p className="loading-subtitle">Processing 7-day meteorological grids for Calauan, Laguna</p>
+            <p className="loading-subtitle">Processing meteorological grids for Calauan, Laguna</p>
           </div>
         ) : error ? (
           <div className="dashboard-error-state">
@@ -360,22 +464,22 @@ const HomePage = () => {
         ) : (
           <>
             {/* Severe Weather Alert Banner — shows for heavy rain, torrential showers, thunderstorms */}
-            {currentWeather && [65, 82, 95, 96, 99].includes(currentWeather.code) && (
+            {effectiveHeroWeather && [65, 82, 95, 96, 99].includes(effectiveHeroWeather.code) && (
               <div className="severe-weather-banner">
                 <div className="severe-banner-stripe"></div>
                 <AlertTriangle size={22} className="severe-banner-icon" />
                 <div className="severe-banner-content">
                   <strong className="severe-banner-title">
-                    {currentWeather.code === 99 ? '🔴 EXTREME WEATHER ALERT' :
-                     currentWeather.code === 96 ? '🟠 SEVERE THUNDERSTORM WARNING' :
-                     currentWeather.code === 95 ? '🟡 THUNDERSTORM ADVISORY' :
-                     currentWeather.code === 82 ? '🔵 TORRENTIAL RAIN WARNING' :
-                     '🔵 HEAVY RAINFALL ADVISORY'}
+                    {effectiveHeroWeather.code === 99 ? '🔴 EXTREME WEATHER ALERT' :
+                      effectiveHeroWeather.code === 96 ? '🟠 SEVERE THUNDERSTORM WARNING' :
+                        effectiveHeroWeather.code === 95 ? '🟡 THUNDERSTORM ADVISORY' :
+                          effectiveHeroWeather.code === 82 ? '🔵 TORRENTIAL RAIN WARNING' :
+                            '🔵 HEAVY RAINFALL ADVISORY'}
                   </strong>
                   <span className="severe-banner-desc">
-                    {currentWeather.code >= 95
-                      ? `Active thunderstorm detected over Calauan — ${currentWeather.details.label}. Seek shelter immediately. Monitor PAGASA and local MDRRMO advisories.`
-                      : `${currentWeather.details.label} ongoing — ${currentWeather.precip?.toFixed(1) || '0.0'} mm precipitation. Exercise caution in flood-prone barangays. Monitor PAGASA bulletins.`
+                    {effectiveHeroWeather.code >= 95
+                      ? `Active thunderstorm conditions detected over Calauan (${effectiveHeroWeather.details.label}). Seek shelter immediately and monitor local advisories.`
+                      : `${effectiveHeroWeather.details.label} ongoing (${effectiveHeroWeather.precip?.toFixed(1) || '0.0'} mm precipitation). Exercise caution in flood-prone barangays.`
                     }
                   </span>
                 </div>
@@ -385,16 +489,56 @@ const HomePage = () => {
             {/* Current Weather & Map Layout Grid */}
             <div className="current-weather-grid">
               {/* Left Column: Current Weather Overview */}
-              {currentWeather && (
+              {effectiveHeroWeather && (
                 <div className="current-weather-card">
-                  <div className="card-top-bar">
-                    <div className="location-pill">
-                      <MapPin size={14} />
-                      <span>Calauan, Laguna (Central Station)</span>
+                  {/* Timeline Scrubber Preview Notice Banner */}
+                  {effectiveHeroWeather.isHourlyPreview && (
+                    <div className="preview-hour-badge">
+                      <div className="preview-text-group">
+                        <Eye size={14} className="preview-eye-icon" />
+                        <span>
+                          Previewing Hourly Forecast: <strong>{effectiveHeroWeather.previewTime}</strong> ({selectedDay.dayName})
+                        </span>
+                      </div>
+                      <button
+                        className="exit-preview-btn"
+                        onClick={() => setPreviewHourIndex(null)}
+                        title="Return to real-time observations"
+                      >
+                        <X size={12} />
+                        <span>Live View</span>
+                      </button>
                     </div>
+                  )}
+
+                  <div className="card-top-bar">
+                    {effectiveHeroWeather.isBarangayFocused ? (
+                      <div className="location-pill focused-barangay-pill">
+                        <MapPin size={14} />
+                        <span>Brgy. {effectiveHeroWeather.focusedName} ({effectiveHeroWeather.focusedType})</span>
+                        <button
+                          className="reset-barangay-btn"
+                          onClick={() => setFocusedBarangay(null)}
+                          title="Reset to Central Station"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="location-pill">
+                        <MapPin size={14} />
+                        <span>Calauan, Laguna (Central Station)</span>
+                      </div>
+                    )}
+
                     <div className="live-status-tag">
-                      <span className="pulse-dot"></span> CURRENT WEATHER {currentTimeStr ? `• ${currentTimeStr}` : ''}
-                      {lastUpdated && (
+                      <span className="pulse-dot"></span>
+                      {effectiveHeroWeather.isHourlyPreview ? (
+                        <span>HOURLY PREVIEW • {effectiveHeroWeather.previewTime}</span>
+                      ) : (
+                        <span>CURRENT WEATHER {currentTimeStr ? `• ${currentTimeStr}` : ''}</span>
+                      )}
+                      {lastUpdated && !effectiveHeroWeather.isHourlyPreview && (
                         <span className="last-updated-tag"> • Updated {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                       )}
                     </div>
@@ -402,21 +546,21 @@ const HomePage = () => {
 
                   <div className="hero-weather-main">
                     <div className="temperature-group">
-                      <span className="temp-value">{currentWeather.temp}°</span>
+                      <span className="temp-value">{effectiveHeroWeather.temp}°</span>
                       <span className="temp-unit">C</span>
                       <div className="feels-like-tag">
-                        Feels like <strong className="text-white">{currentWeather.apparent}°C</strong>
+                        Feels like <strong className="text-white">{effectiveHeroWeather.apparent}°C</strong>
                       </div>
                     </div>
 
                     <div className="condition-visual">
-                      <currentWeather.details.icon
+                      <effectiveHeroWeather.details.icon
                         size={64}
-                        color={currentWeather.details.color}
+                        color={effectiveHeroWeather.details.color}
                         className="weather-hero-icon"
                       />
-                      <span className="condition-label" style={{ color: currentWeather.details.color }}>
-                        {currentWeather.details.label}
+                      <span className="condition-label" style={{ color: effectiveHeroWeather.details.color }}>
+                        {effectiveHeroWeather.details.label}
                       </span>
                     </div>
                   </div>
@@ -445,7 +589,7 @@ const HomePage = () => {
                     <div className="metric-tile">
                       <Droplets className="metric-icon" size={18} />
                       <div className="metric-data">
-                        <span className="metric-value">{currentWeather.humidity}%</span>
+                        <span className="metric-value">{effectiveHeroWeather.humidity}%</span>
                         <span className="metric-label">Relative Humidity</span>
                       </div>
                     </div>
@@ -453,15 +597,15 @@ const HomePage = () => {
                     <div className="metric-tile">
                       <Wind className="metric-icon" size={18} />
                       <div className="metric-data">
-                        <span className="metric-value">{currentWeather.windSpeed} km/h</span>
-                        <span className="metric-label">Wind ({currentWeather.windDirStr})</span>
+                        <span className="metric-value">{effectiveHeroWeather.windSpeed} km/h</span>
+                        <span className="metric-label">Wind ({effectiveHeroWeather.windDirStr})</span>
                       </div>
                     </div>
 
                     <div className="metric-tile">
                       <Gauge className="metric-icon" size={18} />
                       <div className="metric-data">
-                        <span className="metric-value">{currentWeather.pressure} hPa</span>
+                        <span className="metric-value">{effectiveHeroWeather.pressure} hPa</span>
                         <span className="metric-label">Barometric Pressure</span>
                       </div>
                     </div>
@@ -469,7 +613,7 @@ const HomePage = () => {
                     <div className="metric-tile">
                       <CloudRain className="metric-icon" size={18} />
                       <div className="metric-data">
-                        <span className="metric-value">{currentWeather.precipProb}%</span>
+                        <span className="metric-value">{effectiveHeroWeather.precipProb}%</span>
                         <span className="metric-label">Precip Probability</span>
                       </div>
                     </div>
@@ -477,7 +621,7 @@ const HomePage = () => {
                     <div className="metric-tile">
                       <Sun className="metric-icon" size={18} />
                       <div className="metric-data">
-                        <span className="metric-value">{currentWeather.uvIndex}</span>
+                        <span className="metric-value">{effectiveHeroWeather.uvIndex}</span>
                         <span className="metric-label">UV Index (Max)</span>
                       </div>
                     </div>
@@ -485,7 +629,7 @@ const HomePage = () => {
                     <div className="metric-tile">
                       <Cloud className="metric-icon" size={18} />
                       <div className="metric-data">
-                        <span className="metric-value">{currentWeather.cloudCover}%</span>
+                        <span className="metric-value">{effectiveHeroWeather.cloudCover}%</span>
                         <span className="metric-label">Cloud Cover</span>
                       </div>
                     </div>
@@ -494,35 +638,85 @@ const HomePage = () => {
               )}
 
               {/* Right Column: Calauan Municipal Map (ph_municipalities.json) */}
-              <CalauanMap currentWeather={currentWeather} selectedDay={selectedDay} />
+              <CalauanMap
+                currentWeather={currentWeather}
+                selectedDay={selectedDay}
+                previewHour={previewHour}
+                focusedBarangay={focusedBarangay}
+                onFocusBarangay={setFocusedBarangay}
+              />
             </div>
 
-            {/* Calauan Pineapple & Agricultural Advisory Banner */}
+            {/* Calauan Pineapple & Agricultural Operations Bulletin 2.0 */}
             <div className="agricultural-advisory-banner">
-              <div className="advisory-icon-wrapper">
-                <AlertTriangle className="advisory-icon" size={24} />
+              <div className="advisory-main-header">
+                <div className="advisory-icon-wrapper">
+                  <Sprout className="advisory-icon" size={24} />
+                </div>
+                <div>
+                  <h4 className="advisory-title">
+                    Calauan Municipality Agricultural & Pineapple Plantation Bulletin
+                  </h4>
+                  <p className="advisory-subtitle">
+                    Operational field guidance tailored for Laguna pineapple growers & agrarian sectors
+                  </p>
+                </div>
               </div>
-              <div className="advisory-content">
-                <h4 className="advisory-title">
-                  Calauan Municipality Agricultural & Pineapple Plantation Bulletin
-                </h4>
-                <p className="advisory-text">
-                  {parseFloat(selectedDay.precipSum) > 10.0 ? (
-                    <>⚠️ <strong>Heavy Rainfall Advisory:</strong> Expected rainfall of <strong>{selectedDay.precipSum} mm</strong> may cause localized field water accumulation in pineapple & rice farming sectors across Calauan barangays.</>
-                  ) : selectedDay.tempMax > 33 ? (
-                    <>☀️ <strong>High Heat Index Alert:</strong> Peak afternoon temperatures reaching <strong>{selectedDay.tempMax}°C</strong>. Farmers and agricultural personnel are advised to schedule field operations during early morning hours.</>
-                  ) : (
-                    <>✅ <strong>Optimal Operational Status:</strong> Favorable atmospheric conditions for pineapple harvesting, transport, and municipal outdoor activities in Calauan, Laguna.</>
-                  )}
-                </p>
+
+              <div className="agricultural-cards-grid">
+                {/* Card 1: Soil Moisture & Pineapple Harvesting */}
+                <div className="agri-card">
+                  <div className="agri-card-header">
+                    <span className="agri-card-tag pineapple">🍍 Field Harvest & Drainage</span>
+                  </div>
+                  <p className="agri-card-text">
+                    {parseFloat(selectedDay.precipSum) > 10.0 ? (
+                      <>Heavy precipitation risk (<strong>{selectedDay.precipSum} mm</strong>). Water accumulation likely in pineapple furrows and low-lying sectors.</>
+                    ) : parseFloat(selectedDay.precipSum) > 2.0 ? (
+                      <>Passing light rain showers (<strong>{selectedDay.precipSum} mm</strong>). Maintain traction caution on unpaved plantation hauling tracks.</>
+                    ) : (
+                      <>Dry and firm soil conditions (<strong>{selectedDay.precipSum} mm</strong>). Favorable for mechanized and manual pineapple picking.</>
+                    )}
+                  </p>
+                </div>
+
+                {/* Card 2: Spraying & Foliar Application Window */}
+                <div className="agri-card">
+                  <div className="agri-card-header">
+                    <span className="agri-card-tag spray">🍃 Spraying & Fertilizing</span>
+                  </div>
+                  <p className="agri-card-text">
+                    {selectedDay.windMax > 22 ? (
+                      <>Brisk gusts up to <strong>{selectedDay.windMax} km/h</strong>. High risk of chemical drift; postpone foliar spraying operations.</>
+                    ) : selectedDay.precipProbMax > 65 ? (
+                      <>Elevated precipitation risk (<strong>{selectedDay.precipProbMax}%</strong>). Delay fertilizer/chemical spray to prevent wash-off.</>
+                    ) : (
+                      <>Favorable spray window: Low wash-off risk with steady winds (<strong>{selectedDay.windMax} km/h</strong> peak). Best before 10:00 AM.</>
+                    )}
+                  </p>
+                </div>
+
+                {/* Card 3: Farm Labor Heat & Work Hours */}
+                <div className="agri-card">
+                  <div className="agri-card-header">
+                    <span className="agri-card-tag labor">☀️ Field Work Comfort</span>
+                  </div>
+                  <p className="agri-card-text">
+                    {selectedDay.tempMax >= 33 ? (
+                      <>Peak afternoon temperatures reach <strong>{selectedDay.tempMax}°C</strong>. Schedule intense field labor between 05:30 AM–09:30 AM.</>
+                    ) : (
+                      <>Moderate thermal levels (<strong>{selectedDay.tempMax}°C</strong> peak). Suitable for extended daytime plantation operations with hydration.</>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* 7-Day ECMWF IFS HRES 9km Forecast Cards Section */}
+            {/* 7-Day Google WeatherNext 2 Forecast Cards Section */}
             <section className="forecast-section">
               <div className="section-header">
                 <div>
-                  <h2 className="section-title">7-Day ECMWF IFS HRES Forecast</h2>
+                  <h2 className="section-title">Google Weathernext 2 Forecast</h2>
                   <p className="section-subtitle">Select any day below to view detailed hourly atmospheric trends & charts</p>
                 </div>
                 <div className="forecast-days-pill">7 DAYS OUTLOOK</div>
@@ -558,8 +752,8 @@ const HomePage = () => {
                           <div
                             className="temp-bar-fill"
                             style={{
-                              left: `${Math.max(0, ((day.tempMin - 20) / 20) * 100)}%`,
-                              right: `${Math.max(0, 100 - ((day.tempMax - 20) / 20) * 100)}%`
+                              left: `${Math.max(0, ((day.tempMin - globalTempMin) / globalTempRange) * 100)}%`,
+                              right: `${Math.max(0, ((globalTempMax - day.tempMax) / globalTempRange) * 100)}%`
                             }}
                           ></div>
                         </div>
@@ -589,7 +783,7 @@ const HomePage = () => {
                   <h3 className="analytics-title">
                     Hourly Atmospheric Trends — {selectedDay.dayName} ({selectedDay.fullDate})
                   </h3>
-                  <p className="analytics-subtitle">High-resolution ECMWF IFS HRES 9km model predictions</p>
+                  <p className="analytics-subtitle">Google DeepMind WeatherNext 2 Ensemble predictions</p>
                 </div>
 
                 <div className="chart-tab-group">
@@ -635,6 +829,15 @@ const HomePage = () => {
                         contentStyle={{ backgroundColor: '#0d182a', borderColor: '#00d4ff', borderRadius: '8px', color: '#fff' }}
                       />
                       <Legend />
+                      {currentMatchingTimeLabel && (
+                        <ReferenceLine
+                          x={currentMatchingTimeLabel}
+                          stroke="#00d4ff"
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          label={{ value: 'NOW', fill: '#00d4ff', fontSize: 10, position: 'top' }}
+                        />
+                      )}
                       <Area type="monotone" dataKey="temp" name="Air Temp (°C)" stroke="#00d4ff" strokeWidth={3} fillOpacity={1} fill="url(#tempGradient)" />
                       <Area type="monotone" dataKey="apparent" name="Feels Like (°C)" stroke="#f59e0b" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#apparentGradient)" />
                     </AreaChart>
@@ -648,6 +851,16 @@ const HomePage = () => {
                         contentStyle={{ backgroundColor: '#0d182a', borderColor: '#38bdf8', borderRadius: '8px', color: '#fff' }}
                       />
                       <Legend />
+                      {currentMatchingTimeLabel && (
+                        <ReferenceLine
+                          yAxisId="left"
+                          x={currentMatchingTimeLabel}
+                          stroke="#38bdf8"
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          label={{ value: 'NOW', fill: '#38bdf8', fontSize: 10, position: 'top' }}
+                        />
+                      )}
                       <Bar yAxisId="left" dataKey="precipProb" name="Precip Probability (%)" fill="#38bdf8" radius={[4, 4, 0, 0]} />
                       <Bar yAxisId="right" dataKey="precip" name="Rainfall Volume (mm)" fill="#0284c7" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -671,6 +884,16 @@ const HomePage = () => {
                         contentStyle={{ backgroundColor: '#0d182a', borderColor: '#10b981', borderRadius: '8px', color: '#fff' }}
                       />
                       <Legend />
+                      {currentMatchingTimeLabel && (
+                        <ReferenceLine
+                          yAxisId="left"
+                          x={currentMatchingTimeLabel}
+                          stroke="#10b981"
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          label={{ value: 'NOW', fill: '#10b981', fontSize: 10, position: 'top' }}
+                        />
+                      )}
                       <Area yAxisId="left" type="monotone" dataKey="windSpeed" name="Wind Speed (km/h)" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#windGradient)" />
                       <Area yAxisId="right" type="monotone" dataKey="pressure" name="Pressure (hPa)" stroke="#a78bfa" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#pressureGradient)" />
                     </AreaChart>
@@ -679,16 +902,36 @@ const HomePage = () => {
               </div>
             </section>
 
-            {/* Scrollable Hourly Timeline Slider */}
+            {/* Scrollable Hourly Timeline Slider with Time Scrubber Interaction */}
             <section className="timeline-slider-section">
-              <h4 className="slider-title">24-Hour Timeline Stream ({selectedDay.dayName})</h4>
+              <div className="timeline-section-header">
+                <div>
+                  <h4 className="slider-title">24-Hour Timeline Stream ({selectedDay.dayName})</h4>
+                  <p className="slider-subtitle">Click any hour card to scrub & preview that exact time on the dashboard and map</p>
+                </div>
+                {previewHourIndex !== null && (
+                  <button className="reset-preview-btn" onClick={() => setPreviewHourIndex(null)}>
+                    <X size={13} /> Exit Hourly Preview
+                  </button>
+                )}
+              </div>
+
               <div className="timeline-track-container">
-                {hourlyChartData.map((hour) => {
+                {hourlyChartData.map((hour, idx) => {
                   const details = getWeatherDetails(hour.weatherCode);
                   const IconComp = details.icon;
+                  const isNow = selectedDayIndex === 0 && hour.time === currentMatchingTimeLabel;
+                  const isPreviewActive = previewHourIndex === idx;
 
                   return (
-                    <div key={hour.rawTime} className="timeline-hour-card">
+                    <div
+                      key={hour.rawTime}
+                      className={`timeline-hour-card ${isNow ? 'is-now-card' : ''} ${isPreviewActive ? 'is-preview-active' : ''}`}
+                      onClick={() => setPreviewHourIndex(previewHourIndex === idx ? null : idx)}
+                      title={`Click to preview ${hour.time} forecast`}
+                    >
+                      {isNow && <span className="now-indicator-tag">NOW</span>}
+                      {isPreviewActive && <span className="preview-indicator-tag">VIEWING</span>}
                       <span className="hour-time">{hour.time}</span>
                       <IconComp size={24} color={details.color} className="hour-icon" />
                       <span className="hour-temp">{hour.temp}°C</span>
