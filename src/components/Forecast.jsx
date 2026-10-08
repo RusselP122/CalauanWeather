@@ -40,41 +40,41 @@ const DEFAULT_CLUSTER_ENTRIES = [
     storm_id: "MONITORING_LPA01",
     atcf_id: "LPA01",
     init_date: "20261008",
-    cycle: "00Z",
+    cycle: "06Z",
     model: "gdm_wnc_large",
-    filename: "MONITORING_LPA01_20261008_00Z_gdm_wnc_large.png"
+    filename: "MONITORING_LPA01_20261008_06Z_gdm_wnc_large.png"
   },
   {
     storm_id: "MONITORING_LPA01",
     atcf_id: "LPA01",
     init_date: "20261008",
-    cycle: "00Z",
+    cycle: "06Z",
     model: "gdm_wncv3",
-    filename: "MONITORING_LPA01_20261008_00Z_gdm_wncv3.png"
+    filename: "MONITORING_LPA01_20261008_06Z_gdm_wncv3.png"
   },
   {
     storm_id: "MONITORING_LPA02",
     atcf_id: "LPA02",
     init_date: "20261008",
-    cycle: "00Z",
+    cycle: "06Z",
     model: "gdm_wnc_large",
-    filename: "MONITORING_LPA02_20261008_00Z_gdm_wnc_large.png"
+    filename: "MONITORING_LPA02_20261008_06Z_gdm_wnc_large.png"
   },
   {
     storm_id: "MONITORING_LPA04",
     atcf_id: "LPA04",
     init_date: "20261008",
-    cycle: "00Z",
+    cycle: "06Z",
     model: "gdm_wnc_large",
-    filename: "MONITORING_LPA04_20261008_00Z_gdm_wnc_large.png"
+    filename: "MONITORING_LPA04_20261008_06Z_gdm_wnc_large.png"
   },
   {
     storm_id: "MONITORING_LPA03",
     atcf_id: "LPA03",
     init_date: "20261008",
-    cycle: "00Z",
+    cycle: "06Z",
     model: "gdm_wnc_large",
-    filename: "MONITORING_LPA03_20261008_00Z_gdm_wnc_large.png"
+    filename: "MONITORING_LPA03_20261008_06Z_gdm_wnc_large.png"
   }
 ];
 
@@ -398,6 +398,7 @@ const Forecast = () => {
   // Cluster Monitoring Specific States
   const [clusterManifest, setClusterManifest] = useState(DEFAULT_CLUSTER_ENTRIES);
   const [clusterModel, setClusterModel] = useState("gdm_wnc_large"); // 'gdm_wnc_large' | 'gdm_wncv3'
+  const [selectedClusterRun, setSelectedClusterRun] = useState("");
   const [selectedClusterId, setSelectedClusterId] = useState("LPA01");
   const [isClusterSplitView, setIsClusterSplitView] = useState(false);
   const [showClusterHelp, setShowClusterHelp] = useState(false);
@@ -412,7 +413,26 @@ const Forecast = () => {
       .then((json) => {
         if (Array.isArray(json) && json.length > 0) {
           setClusterManifest(json);
-          const firstLpa = json[0].atcf_id || json[0].storm_id;
+          // Extract unique runs: `${init_date}_${cycle}` sorted chronologically newest first
+          const runs = Array.from(
+            new Set(
+              json.map((j) => {
+                const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+                const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+                return `${d}_${c}`;
+              })
+            )
+          ).sort((a, b) => b.localeCompare(a));
+
+          const latestRun = runs[0] || "";
+          setSelectedClusterRun(latestRun);
+
+          const itemsInLatestRun = json.filter((j) => {
+            const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+            const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+            return `${d}_${c}` === latestRun;
+          });
+          const firstLpa = itemsInLatestRun[0]?.atcf_id || itemsInLatestRun[0]?.storm_id || json[0].atcf_id || json[0].storm_id;
           if (firstLpa) setSelectedClusterId(firstLpa);
         }
       })
@@ -544,21 +564,63 @@ const Forecast = () => {
       .filter((item) => item.track && item.track.imageSrc);
   }, [modelsList, selectedType, selectedModelTime, selectedStormId, availableIds, showForecastTrack, showClusters]);
 
-  // Total unique disturbances monitored across all ensemble models
-  const totalClustersCount = useMemo(() => {
-    const ids = new Set(clusterManifest.map((item) => item.atcf_id || item.storm_id));
-    return ids.size;
+  // Available initialization runs in cluster manifest (e.g. '20261008_06Z', '20261008_00Z')
+  // Automatically distinguishes repeating 00Z-18Z cycles across different forecast days!
+  const availableClusterRuns = useMemo(() => {
+    const map = new Map();
+    const allDates = new Set();
+    clusterManifest.forEach((item) => {
+      const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+      allDates.add(d);
+    });
+    const hasMultipleDates = allDates.size > 1;
+
+    clusterManifest.forEach((item) => {
+      const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+      const c = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+      const key = `${d}_${c}`;
+      if (!map.has(key)) {
+        let dateLabel = d;
+        if (d && d.length === 8) {
+          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const mIdx = parseInt(d.slice(4, 6), 10) - 1;
+          const day = parseInt(d.slice(6, 8), 10);
+          if (mIdx >= 0 && mIdx < 12) {
+            dateLabel = `${months[mIdx]} ${day}`;
+          }
+        }
+        map.set(key, {
+          key,
+          init_date: d,
+          cycle: c,
+          dateLabel,
+          displayLabel: hasMultipleDates ? `${dateLabel} · ${c}` : c
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
   }, [clusterManifest]);
 
-  // Derived cluster lists formatted as 'Cluster 01', 'Cluster 02', etc.
-  // In single view, strictly show only the clusters detected by the currently active model!
-  const availableClusterList = useMemo(() => {
-    const targetItems = isClusterSplitView
-      ? clusterManifest
-      : clusterManifest.filter((m) => m.model === clusterModel);
+  // Resolves the currently active cluster run key (fallback to latest available run)
+  const activeClusterRunKey = selectedClusterRun || availableClusterRuns[0]?.key || "";
 
+  // Derived cluster lists formatted as 'Cluster 01', 'Cluster 02', etc.
+  // Filtered by activeClusterRunKey AND (in single-model view) by active clusterModel!
+  const availableClusterList = useMemo(() => {
     const map = new Map();
-    targetItems.forEach((item) => {
+    const runFiltered = clusterManifest.filter((item) => {
+      if (!activeClusterRunKey) return true;
+      const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+      const c = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+      return `${d}_${c}` === activeClusterRunKey;
+    });
+
+    runFiltered.forEach((item) => {
+      // In single model view, only show clusters available for the selected model!
+      if (!isClusterSplitView && item.model !== clusterModel) {
+        return;
+      }
       const key = item.atcf_id || item.storm_id;
       if (!map.has(key)) {
         map.set(key, {
@@ -570,48 +632,73 @@ const Forecast = () => {
       }
       map.get(key).models.push(item.model);
     });
+
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [clusterManifest, clusterModel, isClusterSplitView]);
+  }, [clusterManifest, activeClusterRunKey, isClusterSplitView, clusterModel]);
 
-  const activeClusterItem = useMemo(() => {
-    if (!clusterManifest.length) return null;
-    let match = clusterManifest.find(
-      (m) => m.model === clusterModel && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
-    );
-    if (!match) {
-      match = clusterManifest.find((m) => m.model === clusterModel);
-    }
-    if (!match) {
-      match = clusterManifest[0];
-    }
-    return match;
-  }, [clusterManifest, clusterModel, selectedClusterId]);
-
-  // When in single model view, keep selectedClusterId synchronized with clusterModel and availableClusterList
+  // Auto-snap selected cluster if current selection is not in active model / run list
   useEffect(() => {
-    if (selectedType === "cluster" && !isClusterSplitView && availableClusterList.length > 0) {
+    if (availableClusterList.length > 0) {
       const exists = availableClusterList.some((c) => c.id === selectedClusterId);
       if (!exists) {
         setSelectedClusterId(availableClusterList[0].id);
       }
     }
-  }, [selectedType, isClusterSplitView, clusterModel, availableClusterList, selectedClusterId]);
+  }, [availableClusterList, selectedClusterId]);
+
+  const activeClusterItem = useMemo(() => {
+    if (!clusterManifest.length) return null;
+    const runItems = activeClusterRunKey
+      ? clusterManifest.filter((m) => {
+          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+          return `${d}_${c}` === activeClusterRunKey;
+        })
+      : clusterManifest;
+
+    let match = runItems.find(
+      (m) => m.model === clusterModel && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
+    );
+    if (!match) {
+      match = runItems.find((m) => m.model === clusterModel);
+    }
+    if (!match) {
+      match = runItems[0] || clusterManifest[0];
+    }
+    return match;
+  }, [clusterManifest, activeClusterRunKey, clusterModel, selectedClusterId]);
 
   const splitV3Item = useMemo(() => {
+    const runItems = activeClusterRunKey
+      ? clusterManifest.filter((m) => {
+          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+          return `${d}_${c}` === activeClusterRunKey;
+        })
+      : clusterManifest;
+
     return (
-      clusterManifest.find(
+      runItems.find(
         (m) => m.model === "gdm_wncv3" && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
       ) || null
     );
-  }, [clusterManifest, selectedClusterId]);
+  }, [clusterManifest, activeClusterRunKey, selectedClusterId]);
 
   const splitLargeItem = useMemo(() => {
+    const runItems = activeClusterRunKey
+      ? clusterManifest.filter((m) => {
+          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+          return `${d}_${c}` === activeClusterRunKey;
+        })
+      : clusterManifest;
+
     return (
-      clusterManifest.find(
+      runItems.find(
         (m) => m.model === "gdm_wnc_large" && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
       ) || null
     );
-  }, [clusterManifest, selectedClusterId]);
+  }, [clusterManifest, activeClusterRunKey, selectedClusterId]);
 
   const handleNextCluster = useCallback(() => {
     if (!availableClusterList.length) return;
@@ -1074,7 +1161,7 @@ const Forecast = () => {
                 >
                   <span className="cluster-radar-pulse" />
                   <span>Cluster</span>
-                  <span className="cluster-badge-count">{totalClustersCount || "Live"}</span>
+                  <span className="cluster-badge-count">{availableClusterList.length || "Live"}</span>
                   <kbd className="cluster-kbd-tag">C</kbd>
                 </button>
               </div>
@@ -1085,66 +1172,48 @@ const Forecast = () => {
           {/* Timeline Run Selector Carousel (Hidden in Cluster tracking mode) */}
           {selectedType !== "cluster" && (
             <div className="timeline-carousel-container">
-            <div className="timeline-carousel-header">
-              <span>Model Run Cycles Timeline</span>
-              <span>All Times PHST (UTC+8)</span>
-            </div>
-            <div className="timeline-track-wrapper">
-              <div className="timeline-track">
-                {allPossibleCycles.map((cycleTime) => {
-                  const isActive = selectedModelTime === cycleTime;
-                  const hasData = hasDataForCycle(cycleTime);
-                  const timeStr = toPhstLabel(cycleTime);
-                  const dateStr = toPrettyDate(cycleTime);
-                  const utcLabel = `${cycleTime.split("T")[1].slice(0, 2)}Z`;
+              <div className="timeline-carousel-header">
+                <span>Model Run Cycles Timeline</span>
+                <span>All Times PHST (UTC+8)</span>
+              </div>
+              <div className="timeline-track-wrapper">
+                <div className="timeline-track">
+                  {allPossibleCycles.map((cycleTime) => {
+                    const isActive = selectedModelTime === cycleTime;
+                    const hasData = hasDataForCycle(cycleTime);
+                    const timeStr = toPhstLabel(cycleTime);
+                    const dateStr = toPrettyDate(cycleTime);
+                    const utcLabel = `${cycleTime.split("T")[1].slice(0, 2)}Z`;
 
-                  return (
-                    <div
-                      key={cycleTime}
-                      onClick={() => {
-                        setSelectedModelTime(cycleTime);
-                        setHasManuallySelected(true);
-                      }}
-                      className={`timeline-node ${isActive ? "active" : ""}`}
-                      style={!hasData ? { opacity: 0.5, borderStyle: "dashed" } : {}}
-                    >
-                      <span className="timeline-node-date">{dateStr}</span>
-                      <span className="timeline-node-time">{timeStr}</span>
-                      <div className="timeline-node-badge">
-                        {utcLabel} {!hasData && "(Pending)"}
+                    return (
+                      <div
+                        key={cycleTime}
+                        onClick={() => {
+                          setSelectedModelTime(cycleTime);
+                          setHasManuallySelected(true);
+                        }}
+                        className={`timeline-node ${isActive ? "active" : ""}`}
+                        style={!hasData ? { opacity: 0.5, borderStyle: "dashed" } : {}}
+                      >
+                        <span className="timeline-node-date">{dateStr}</span>
+                        <span className="timeline-node-time">{timeStr}</span>
+                        <div className="timeline-node-badge">
+                          {utcLabel} {!hasData && "(Pending)"}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-            {((selectedModel === "fnv3_base" || selectedModel === "fnv3_large") && !isCompareGrid) && (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-                <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
-                  View Mode:
-                </span>
-                <div style={{ display: "flex", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <button
-                    onClick={() => { setShowClusters(false); setShowForecastTrack(false); }}
-                    className={`toggle-btn ${(!showClusters && !showForecastTrack) ? "active" : ""}`}
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      borderRadius: "0.35rem",
-                      fontSize: "0.7rem",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      border: "none",
-                      backgroundColor: (!showClusters && !showForecastTrack) ? "var(--bg-light)" : "transparent",
-                      color: (!showClusters && !showForecastTrack) ? "var(--accent-color)" : "var(--text-muted)",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    STANDARD OUTLOOK
-                  </button>
-                  {selectedModel === "fnv3_large" && (
+              {((selectedModel === "fnv3_base" || selectedModel === "fnv3_large") && !isCompareGrid) && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
+                    View Mode:
+                  </span>
+                  <div style={{ display: "flex", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
                     <button
-                      onClick={() => { setShowClusters(true); setShowForecastTrack(false); }}
-                      className={`toggle-btn ${showClusters ? "active" : ""}`}
+                      onClick={() => { setShowClusters(false); setShowForecastTrack(false); }}
+                      className={`toggle-btn ${(!showClusters && !showForecastTrack) ? "active" : ""}`}
                       style={{
                         padding: "0.25rem 0.5rem",
                         borderRadius: "0.35rem",
@@ -1152,63 +1221,62 @@ const Forecast = () => {
                         fontWeight: "900",
                         cursor: "pointer",
                         border: "none",
-                        backgroundColor: showClusters ? "var(--bg-light)" : "transparent",
-                        color: showClusters ? "var(--accent-color)" : "var(--text-muted)",
+                        backgroundColor: (!showClusters && !showForecastTrack) ? "var(--bg-light)" : "transparent",
+                        color: (!showClusters && !showForecastTrack) ? "var(--accent-color)" : "var(--text-muted)",
                         transition: "all 0.2s"
                       }}
                     >
-                      TRACK CLUSTERS
+                      STANDARD OUTLOOK
                     </button>
-                  )}
-                  <button
-                    onClick={() => { setShowClusters(false); setShowForecastTrack(true); }}
-                    className={`toggle-btn ${showForecastTrack ? "active" : ""}`}
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      borderRadius: "0.35rem",
-                      fontSize: "0.7rem",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      border: "none",
-                      backgroundColor: showForecastTrack ? "var(--bg-light)" : "transparent",
-                      color: showForecastTrack ? "var(--accent-color)" : "var(--text-muted)",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    FORECAST TRACK
-                  </button>
+                    {selectedModel === "fnv3_large" && (
+                      <button
+                        onClick={() => { setShowClusters(true); setShowForecastTrack(false); }}
+                        className={`toggle-btn ${showClusters ? "active" : ""}`}
+                        style={{
+                          padding: "0.25rem 0.5rem",
+                          borderRadius: "0.35rem",
+                          fontSize: "0.7rem",
+                          fontWeight: "900",
+                          cursor: "pointer",
+                          border: "none",
+                          backgroundColor: showClusters ? "var(--bg-light)" : "transparent",
+                          color: showClusters ? "var(--accent-color)" : "var(--text-muted)",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        TRACK CLUSTERS
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setShowClusters(false); setShowForecastTrack(true); }}
+                      className={`toggle-btn ${showForecastTrack ? "active" : ""}`}
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        borderRadius: "0.35rem",
+                        fontSize: "0.7rem",
+                        fontWeight: "900",
+                        cursor: "pointer",
+                        border: "none",
+                        backgroundColor: showForecastTrack ? "var(--bg-light)" : "transparent",
+                        color: showForecastTrack ? "var(--accent-color)" : "var(--text-muted)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      FORECAST TRACK
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {showForecastTrack && stormsIndex.length > 0 && !isCompareGrid && (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
-                  Storm Track:
-                </span>
-                <div style={{ display: "flex", flexWrap: "wrap", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)", gap: "0.25rem" }}>
-                  <button
-                    onClick={() => setSelectedStormId("latest")}
-                    className={`toggle-btn ${selectedStormId === "latest" ? "active" : ""}`}
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      borderRadius: "0.35rem",
-                      fontSize: "0.7rem",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      border: "none",
-                      backgroundColor: selectedStormId === "latest" ? "var(--bg-light)" : "transparent",
-                      color: selectedStormId === "latest" ? "var(--accent-color)" : "var(--text-muted)",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    ALL SYSTEMS (COMPOSITE)
-                  </button>
-                  {stormsIndex.map((storm) => (
+              {showForecastTrack && stormsIndex.length > 0 && !isCompareGrid && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
+                    Storm Track:
+                  </span>
+                  <div style={{ display: "flex", flexWrap: "wrap", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)", gap: "0.25rem" }}>
                     <button
-                      key={storm.track_id}
-                      onClick={() => setSelectedStormId(storm.track_id)}
-                      className={`toggle-btn ${selectedStormId === storm.track_id ? "active" : ""}`}
+                      onClick={() => setSelectedStormId("latest")}
+                      className={`toggle-btn ${selectedStormId === "latest" ? "active" : ""}`}
                       style={{
                         padding: "0.25rem 0.5rem",
                         borderRadius: "0.35rem",
@@ -1216,18 +1284,37 @@ const Forecast = () => {
                         fontWeight: "900",
                         cursor: "pointer",
                         border: "none",
-                        backgroundColor: selectedStormId === storm.track_id ? "var(--bg-light)" : "transparent",
-                        color: selectedStormId === storm.track_id ? "var(--accent-color)" : "var(--text-muted)",
+                        backgroundColor: selectedStormId === "latest" ? "var(--bg-light)" : "transparent",
+                        color: selectedStormId === "latest" ? "var(--accent-color)" : "var(--text-muted)",
                         transition: "all 0.2s"
                       }}
                     >
-                      {storm.storm_name.toUpperCase()} ({storm.track_id})
+                      ALL SYSTEMS (COMPOSITE)
                     </button>
-                  ))}
+                    {stormsIndex.map((storm) => (
+                      <button
+                        key={storm.track_id}
+                        onClick={() => setSelectedStormId(storm.track_id)}
+                        className={`toggle-btn ${selectedStormId === storm.track_id ? "active" : ""}`}
+                        style={{
+                          padding: "0.25rem 0.5rem",
+                          borderRadius: "0.35rem",
+                          fontSize: "0.7rem",
+                          fontWeight: "900",
+                          cursor: "pointer",
+                          border: "none",
+                          backgroundColor: selectedStormId === storm.track_id ? "var(--bg-light)" : "transparent",
+                          color: selectedStormId === storm.track_id ? "var(--accent-color)" : "var(--text-muted)",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        {storm.storm_name.toUpperCase()} ({storm.track_id})
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           )}
 
           {/* Dashboard Panels */}
@@ -1254,6 +1341,23 @@ const Forecast = () => {
                   </div>
 
                   <div className="cluster-actions-group">
+                    {/* Cycle Segmented Control */}
+                    {availableClusterRuns.length > 1 && (
+                      <div className="cluster-cycle-segmented">
+                        <span className="cycle-seg-label">Cycle:</span>
+                        {availableClusterRuns.map((run) => (
+                          <button
+                            key={run.key}
+                            onClick={() => setSelectedClusterRun(run.key)}
+                            className={`cluster-cycle-btn ${activeClusterRunKey === run.key ? "active" : ""}`}
+                            title={`Run Initialization: ${run.dateLabel} ${run.cycle}`}
+                          >
+                            {run.displayLabel}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Model Segmented Control (Active in Single View) */}
                     {!isClusterSplitView && (
                       <div className="cluster-model-segmented">
@@ -1311,7 +1415,7 @@ const Forecast = () => {
                             key={c.id}
                             onClick={() => {
                               setSelectedClusterId(c.id);
-                              if (!isClusterSplitView && !hasInCurrentModel && c.models.length > 0) {
+                              if (!hasInCurrentModel && c.models.length > 0) {
                                 setClusterModel(c.models[0]);
                               }
                             }}
@@ -1336,39 +1440,28 @@ const Forecast = () => {
                     <div className="cluster-split-card">
                       <div className="cluster-split-header">
                         <div className="split-model-tag v3-tag">GDM WNCv3</div>
-                        <span className="split-storm-tag">{formatClusterLabel(selectedClusterId)}</span>
-                        <span className="split-members-tag">{splitV3Item ? "64 Members" : "No Detection (0/64)"}</span>
+                        <span className="split-storm-tag">{formatClusterLabel(splitV3Item?.atcf_id || selectedClusterId)}</span>
+                        <span className="split-members-tag">51 Members</span>
                       </div>
                       <div
-                        className={`cluster-image-wrapper split-image-wrap ${!splitV3Item ? "no-signal-wrap" : ""}`}
+                        className="cluster-image-wrapper split-image-wrap"
                         onClick={() => splitV3Item && openClusterLightbox(splitV3Item)}
                       >
                         {splitV3Item ? (
-                          <>
-                            <img
-                              src={getAssetUrl(`/assets/${splitV3Item.filename}`)}
-                              alt="GDM WNCv3 Monitoring Plot"
-                              className="cluster-img"
-                            />
-                            <div className="cluster-hover-hint">
-                              <Maximize2 size={16} />
-                              <span>Click to Expand Lightbox</span>
-                            </div>
-                          </>
+                          <img
+                            src={getAssetUrl(`/assets/${splitV3Item.filename}`)}
+                            alt="GDM WNCv3 Monitoring Plot"
+                            className="cluster-img"
+                          />
                         ) : (
-                          <div className="cluster-empty-signal">
-                            <div className="empty-signal-icon-ring">
-                              <Activity size={24} className="empty-signal-icon" />
-                            </div>
-                            <h4>No WNCv3 Signal</h4>
-                            <p>
-                              <strong>{formatClusterLabel(selectedClusterId)}</strong> did not meet the cyclogenesis threshold in GDM WNCv3 (64-ENS).
-                            </p>
-                            <span className="empty-signal-badge">
-                              Detected exclusively by GDM WNC Large (1,001-ENS)
-                            </span>
+                          <div className="empty-state">
+                            <span>No WNCv3 disturbance signal detected for {formatClusterLabel(selectedClusterId)}.</span>
                           </div>
                         )}
+                        <div className="cluster-hover-hint">
+                          <Maximize2 size={16} />
+                          <span>Click to Expand Lightbox</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1376,39 +1469,28 @@ const Forecast = () => {
                     <div className="cluster-split-card">
                       <div className="cluster-split-header">
                         <div className="split-model-tag large-tag">GDM WNC Large</div>
-                        <span className="split-storm-tag">{formatClusterLabel(selectedClusterId)}</span>
-                        <span className="split-members-tag">{splitLargeItem ? "1,001 Members" : "No Detection (0/1001)"}</span>
+                        <span className="split-storm-tag">{formatClusterLabel(splitLargeItem?.atcf_id || selectedClusterId)}</span>
+                        <span className="split-members-tag">1,001 Members</span>
                       </div>
                       <div
-                        className={`cluster-image-wrapper split-image-wrap ${!splitLargeItem ? "no-signal-wrap" : ""}`}
+                        className="cluster-image-wrapper split-image-wrap"
                         onClick={() => splitLargeItem && openClusterLightbox(splitLargeItem)}
                       >
                         {splitLargeItem ? (
-                          <>
-                            <img
-                              src={getAssetUrl(`/assets/${splitLargeItem.filename}`)}
-                              alt="GDM WNC Large Monitoring Plot"
-                              className="cluster-img"
-                            />
-                            <div className="cluster-hover-hint">
-                              <Maximize2 size={16} />
-                              <span>Click to Expand Lightbox</span>
-                            </div>
-                          </>
+                          <img
+                            src={getAssetUrl(`/assets/${splitLargeItem.filename}`)}
+                            alt="GDM WNC Large Monitoring Plot"
+                            className="cluster-img"
+                          />
                         ) : (
-                          <div className="cluster-empty-signal">
-                            <div className="empty-signal-icon-ring">
-                              <Activity size={24} className="empty-signal-icon" />
-                            </div>
-                            <h4>No WNC Large Signal</h4>
-                            <p>
-                              <strong>{formatClusterLabel(selectedClusterId)}</strong> did not meet the threshold in GDM WNC Large.
-                            </p>
-                            <span className="empty-signal-badge">
-                              Detected by GDM WNCv3 (64-ENS)
-                            </span>
+                          <div className="empty-state">
+                            <span>No WNC Large disturbance signal detected for {formatClusterLabel(selectedClusterId)}.</span>
                           </div>
                         )}
+                        <div className="cluster-hover-hint">
+                          <Maximize2 size={16} />
+                          <span>Click to Expand Lightbox</span>
+                        </div>
                       </div>
                     </div>
                   </div>

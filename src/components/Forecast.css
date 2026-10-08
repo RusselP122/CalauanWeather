@@ -994,13 +994,25 @@
 
 /* Keyframes & Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes zoomIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 
@@ -1188,8 +1200,13 @@
   transform: translateY(-50%) scale(1.08);
 }
 
-.lightbox-side-btn.side-left { left: 1rem; }
-.lightbox-side-btn.side-right { right: 1rem; }
+.lightbox-side-btn.side-left {
+  left: 1rem;
+}
+
+.lightbox-side-btn.side-right {
+  right: 1rem;
+}
 
 /* Bottom Stepper Pill Bar */
 .lightbox-bottom-stepper {
@@ -1271,8 +1288,14 @@
     width: 36px;
     height: 36px;
   }
-  .lightbox-side-btn.side-left { left: 0.4rem; }
-  .lightbox-side-btn.side-right { right: 0.4rem; }
+
+  .lightbox-side-btn.side-left {
+    left: 0.4rem;
+  }
+
+  .lightbox-side-btn.side-right {
+    right: 0.4rem;
+  }
 }
 
 /* ==========================================================================
@@ -1305,9 +1328,11 @@
   0% {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
   }
+
   70% {
     box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
   }
@@ -1358,9 +1383,11 @@
   0% {
     box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.8);
   }
+
   70% {
     box-shadow: 0 0 0 8px rgba(0, 240, 255, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(0, 240, 255, 0);
   }
@@ -1431,6 +1458,50 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* Cycle Segmented Control */
+.cluster-cycle-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(10, 15, 29, 0.8);
+  padding: 0.2rem 0.35rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.cycle-seg-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 0.25rem;
+  letter-spacing: 0.04em;
+}
+
+.cluster-cycle-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cluster-cycle-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cluster-cycle-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Model Segmented Control */
@@ -1974,8 +2045,13 @@
 }
 
 @keyframes helpFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .cluster-help-dialog {
@@ -2133,5 +2209,3 @@
   border-radius: 6px;
   margin-top: 0.25rem;
 }
-
-

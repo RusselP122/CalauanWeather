@@ -466,18 +466,27 @@ def is_atcf_storm_or_invest(tracks, knack_storms=None, atcf_index_storms=None):
 
     return False, ""
 
-def aggregate_nursery_lpas(validated_lpas, max_nursery_dist=600.0, max_genesis_gap_h=96.0, min_motion_cos=0.50):
+def aggregate_nursery_lpas(
+    candidate_lpas, 
+    max_nursery_dist=600.0, 
+    max_genesis_gap_h=96.0, 
+    min_motion_cos=0.50,
+    min_motion_displacement_km=120.0,
+    max_member_overlap=0.20
+):
     """
-    Groups validated LPA candidate clusters originating within the same spatial nursery (<= 600km)
-    with compatible trajectory heading vectors and overlapping/adjacent genesis time windows.
+    Groups LPA candidate clusters originating within the same spatial nursery (<= 600km)
+    with compatible trajectory heading vectors, overlapping/adjacent genesis time windows,
+    and distinct ensemble member realizations (preventing collapsing sequential storms from the same member).
     Deduplicates tracks per ensemble member to maintain statistical integrity.
     """
-    if len(validated_lpas) <= 1:
-        return validated_lpas
+    if len(candidate_lpas) <= 1:
+        return candidate_lpas
 
     lpas_with_meta = []
-    for idx, c in enumerate(validated_lpas):
+    for idx, c in enumerate(candidate_lpas):
         tracks = c['tracks']
+        # Measure genesis point: first validated detection of each track (f_lat, f_lon)
         avg_lat = c.get('avg_lat', float(np.mean([t['f_lat'] for t in tracks])))
         avg_lon = c.get('avg_lon', float(np.mean([t['f_lon'] for t in tracks])))
         avg_h = c.get('avg_h', float(np.mean([t['h_min'] for t in tracks])))
@@ -502,15 +511,24 @@ def aggregate_nursery_lpas(validated_lpas, max_nursery_dist=600.0, max_genesis_g
         mean_dx = np.mean(dx_list) if dx_list else 0.0
         mean_dy = np.mean(dy_list) if dy_list else 0.0
         norm = math.sqrt(mean_dx**2 + mean_dy**2)
-        dir_vec = (mean_dx / norm, mean_dy / norm) if norm > 0 else (0.0, 0.0)
+
+        # Heading check: Only keep dir_vec if mean 48h displacement is above threshold (~100-150 km).
+        # For slow-moving or quasi-stationary genesis clusters (typical for LPAs at low latitudes),
+        # early displacement is small/noisy. In that case, dir_vec is None so cosine test is skipped.
+        if norm >= min_motion_displacement_km:
+            dir_vec = (mean_dx / norm, mean_dy / norm)
+        else:
+            dir_vec = None
 
         lpas_with_meta.append({
+            'cluster_label': c.get('cluster_label', f"Candidate_{idx+1}"),
             'tracks': tracks,
             'members': c['members'],
             'avg_lat': avg_lat,
             'avg_lon': avg_lon,
             'avg_h': avg_h,
             'dir_vec': dir_vec,
+            'displacement_km': norm,
             'max_w': c['max_w'],
             'min_p': c['min_p'],
             'duration': c['duration']
@@ -526,12 +544,24 @@ def aggregate_nursery_lpas(validated_lpas, max_nursery_dist=600.0, max_genesis_g
         group = [anchor]
         used.add(i)
 
+        group_mems = {t['sample'] for t in anchor['tracks']}
+
         for j, candidate in enumerate(sorted_lpas):
             if j in used:
                 continue
-            # 1. Spatial distance between nursery genesis centers
+
+            # 1. Spatial distance between nursery genesis centers (genesis points)
             dist_gen = haversine_km(anchor['avg_lat'], anchor['avg_lon'], candidate['avg_lat'], candidate['avg_lon'])
             if dist_gen > max_nursery_dist:
+                # Log if candidate was close to a secondary group member but rejected by anchor to monitor order-dependency
+                close_to_secondary = any(
+                    haversine_km(g['avg_lat'], g['avg_lon'], candidate['avg_lat'], candidate['avg_lon']) <= max_nursery_dist
+                    for g in group[1:]
+                )
+                if close_to_secondary:
+                    print(f"Nursery Aggregation Notice: Candidate {candidate.get('cluster_label')} at ({candidate['avg_lat']:.1f}N, {candidate['avg_lon']:.1f}E) "
+                          f"is within {max_nursery_dist:.0f}km of a secondary group member, but {dist_gen:.0f}km from anchor ({anchor['avg_lat']:.1f}N, {anchor['avg_lon']:.1f}E). "
+                          f"Retained as separate to prevent basin chaining.")
                 continue
 
             # 2. Timing gap between genesis lead hours
@@ -540,11 +570,28 @@ def aggregate_nursery_lpas(validated_lpas, max_nursery_dist=600.0, max_genesis_g
                 continue
 
             # 3. Trajectory heading compatibility
-            cos_sim = anchor['dir_vec'][0] * candidate['dir_vec'][0] + anchor['dir_vec'][1] * candidate['dir_vec'][1]
-            if cos_sim < min_motion_cos:
+            # Skip cosine test when either vector is None (quasi-stationary or slow mover)
+            if anchor['dir_vec'] is not None and candidate['dir_vec'] is not None:
+                cos_sim = anchor['dir_vec'][0] * candidate['dir_vec'][0] + anchor['dir_vec'][1] * candidate['dir_vec'][1]
+                if cos_sim < min_motion_cos:
+                    continue
+
+            # 4. Ensemble member overlap test ("same event" realization gate)
+            # If two clusters share almost no members, they are alternative realizations of one event.
+            # If they share many members, those members produced two separate systems in sequence.
+            cand_mems = {t['sample'] for t in candidate['tracks']}
+            shared_mems = group_mems.intersection(cand_mems)
+            min_member_pool = min(len(group_mems), len(cand_mems))
+            overlap_ratio = len(shared_mems) / min_member_pool if min_member_pool > 0 else 0.0
+
+            if overlap_ratio > max_member_overlap:
+                print(f"Nursery Aggregation Notice: Candidate {candidate.get('cluster_label')} shares {len(shared_mems)}/{min_member_pool} "
+                      f"members ({overlap_ratio:.1%}) with group (> {max_member_overlap:.0%}). "
+                      f"Treated as distinct sequential/concurrent events and kept separate.")
                 continue
 
             group.append(candidate)
+            group_mems.update(cand_mems)
             used.add(j)
 
         if len(group) == 1:
@@ -578,8 +625,10 @@ def aggregate_nursery_lpas(validated_lpas, max_nursery_dist=600.0, max_genesis_g
         c_min_p = float(min(t['min_p'] for t in deduped))
         c_duration = float(max(t['h_max'] for t in deduped) - min(t['h_min'] for t in deduped))
 
-        print(f"Spatial Nursery Aggregation: Merged {len(group)} candidate clusters near ({c_lat:.1f}N, {c_lon:.1f}E) into unified signal with {num_mems} members")
+        merged_label = anchor.get('cluster_label', f"Nursery_{i+1}")
+        print(f"Spatial Nursery Aggregation: Merged {len(group)} candidate clusters (anchored by {merged_label}) near ({c_lat:.1f}N, {c_lon:.1f}E) into unified signal with {num_mems} members")
         merged.append({
+            'cluster_label': merged_label,
             'tracks': deduped,
             'members': num_mems,
             'avg_lat': c_lat,
@@ -604,11 +653,14 @@ def cluster_and_validate_lpas(
     max_dist=450.0,
     enable_nursery_aggregation=True,
     max_nursery_dist=600.0,
-    max_nursery_gap_h=96.0
+    max_nursery_gap_h=96.0,
+    min_motion_cos=0.50,
+    min_motion_disp_km=120.0,
+    max_member_overlap=0.20
 ):
     """
     Identifies, clusters, and validates tropical disturbances under monitoring using Average-Linkage
-    spatio-temporal clustering. Prevents chaining and survivor bias.
+    spatio-temporal clustering and nursery aggregation. Prevents chaining, survivor bias, and fragment dropout.
     """
     if df_wp.empty:
         return df_wp, []
@@ -716,14 +768,14 @@ def cluster_and_validate_lpas(
             
             d_gen = haversine_km(t1['f_lat'], t1['f_lon'], t2['f_lat'], t2['f_lon'])
             
-            if d_gen > 600.0 or d_early_mean > 500.0:
+            if d_gen > max_nursery_dist or d_early_mean > 500.0:
                 continue
                 
             d_all_sum = sum(haversine_km(t1['points_dict'][h][0], t1['points_dict'][h][1],
                                          t2['points_dict'][h][0], t2['points_dict'][h][1]) for h in sorted_overlap)
             d_all_mean = d_all_sum / len(sorted_overlap)
             
-            combined_dist = 0.40 * d_gen + 0.40 * d_early_mean + 0.20 * min(600.0, d_all_mean) + (dh * 2.0)
+            combined_dist = 0.40 * d_gen + 0.40 * d_early_mean + 0.20 * min(max_nursery_dist, d_all_mean) + (dh * 2.0)
             dist_matrix[i, j] = combined_dist
             dist_matrix[j, i] = combined_dist
             
@@ -738,7 +790,10 @@ def cluster_and_validate_lpas(
             clusters[lbl] = []
         clusters[lbl].append(tracks[idx])
         
-    validated_lpas = []
+    # Loose floor for candidate collection: prevents dropping genuine nursery fragments
+    # before they have a chance to merge into a robust unified signal.
+    candidate_floor = max(2, min_members // 3)
+    candidate_lpas = []
     for lbl, cl_tracks in clusters.items():
         # Member deduplication: Keep at most 1 representative trajectory per ensemble member
         by_member = {}
@@ -757,7 +812,7 @@ def cluster_and_validate_lpas(
                 deduped_tracks.append(best_t)
                 
         num_members = len(deduped_tracks)
-        if num_members < min_members:
+        if num_members < candidate_floor:
             continue
             
         avg_lat = float(np.mean([t['f_lat'] for t in deduped_tracks]))
@@ -766,28 +821,23 @@ def cluster_and_validate_lpas(
         max_w = float(max(t['max_w'] for t in deduped_tracks))
         min_p = float(min(t['min_p'] for t in deduped_tracks))
         
-        # Duration check
+        # Duration calculation
         earliest_h = min(t['h_min'] for t in deduped_tracks)
         latest_h = max(t['h_max'] for t in deduped_tracks)
         duration = latest_h - earliest_h
-        if duration < min_duration:
-            continue
-            
-        # Intensity check
-        if (np.isnan(max_w) or max_w < min_wind_kt) and (np.isnan(min_p) or min_p > max_mslp_hpa):
-            continue
             
         # Spatial domain check (Lat 0-38N, Lon 100-180E)
         if not (0.0 <= avg_lat <= 38.0 and 100.0 <= avg_lon <= 180.0):
             continue
             
-        # Check if this cluster corresponds to an official ATCF storm or invest
+        # TC Suppression: Run haversine TC suppression BEFORE grouping.
+        # Otherwise a nearby mature TC's remnants or outer circulation can get pulled into a nursery.
         is_atcf, reason = is_atcf_storm_or_invest(deduped_tracks, knack_storms=knack_storms, atcf_index_storms=atcf_index_storms)
         if is_atcf:
-            print(f"Skipping cluster candidate {lbl}: {reason} (Official ATCF storm/invest - no monitoring plot needed)")
+            print(f"Skipping pre-candidate cluster {lbl}: {reason} (TC suppression active - no monitoring plot needed)")
             continue
             
-        validated_lpas.append({
+        candidate_lpas.append({
             'cluster_label': lbl,
             'tracks': deduped_tracks,
             'members': num_members,
@@ -798,13 +848,46 @@ def cluster_and_validate_lpas(
             'avg_lon': avg_lon,
             'avg_h': avg_h
         })
+
     # Spatial Nursery Aggregation: Combine clusters from the same geographic nursery
-    if enable_nursery_aggregation and len(validated_lpas) > 1:
-        validated_lpas = aggregate_nursery_lpas(
-            validated_lpas,
+    if enable_nursery_aggregation and len(candidate_lpas) > 1:
+        aggregated_groups = aggregate_nursery_lpas(
+            candidate_lpas,
             max_nursery_dist=max_nursery_dist,
-            max_genesis_gap_h=max_nursery_gap_h
+            max_genesis_gap_h=max_nursery_gap_h,
+            min_motion_cos=min_motion_cos,
+            min_motion_displacement_km=min_motion_disp_km,
+            max_member_overlap=max_member_overlap
         )
+    else:
+        aggregated_groups = candidate_lpas
+
+    # Apply strict validation criteria to the aggregated nursery groups
+    validated_lpas = []
+    for grp in aggregated_groups:
+        # 1. Strict ensemble member count filter
+        if grp['members'] < min_members:
+            continue
+
+        # 2. Strict duration filter
+        if grp['duration'] < min_duration:
+            continue
+
+        # 3. Strict intensity filter
+        if (np.isnan(grp['max_w']) or grp['max_w'] < min_wind_kt) and (np.isnan(grp['min_p']) or grp['min_p'] > max_mslp_hpa):
+            continue
+
+        # 4. Strict domain check
+        if not (0.0 <= grp['avg_lat'] <= 38.0 and 100.0 <= grp['avg_lon'] <= 180.0):
+            continue
+
+        # 5. Secondary ATCF check on merged group
+        is_atcf, reason = is_atcf_storm_or_invest(grp['tracks'], knack_storms=knack_storms, atcf_index_storms=atcf_index_storms)
+        if is_atcf:
+            print(f"Skipping merged cluster {grp.get('cluster_label')}: {reason} (Official ATCF storm/invest)")
+            continue
+
+        validated_lpas.append(grp)
 
     # Sort validated LPAs by member support, then intensity
     validated_lpas.sort(key=lambda x: (x['members'], x['max_w'] if not np.isnan(x['max_w']) else 0), reverse=True)
@@ -1744,6 +1827,9 @@ def main():
     parser.add_argument('--nursery-aggregation', action='store_true', default=True, help="Aggregate compatible candidate clusters in the same spatial nursery")
     parser.add_argument('--no-nursery-aggregation', action='store_false', dest='nursery_aggregation', help="Disable spatial nursery aggregation")
     parser.add_argument('--nursery-dist', type=float, default=600.0, help="Maximum distance in km between genesis centers to aggregate into a single nursery signal")
+    parser.add_argument('--nursery-gap-h', type=float, default=96.0, help="Maximum timing gap in lead hours between genesis times for nursery aggregation")
+    parser.add_argument('--min-motion-disp', type=float, default=120.0, help="Minimum 48h displacement in km required to evaluate heading compatibility")
+    parser.add_argument('--max-member-overlap', type=float, default=0.20, help="Maximum ensemble member overlap ratio to allow merging as alternative realizations")
     args = parser.parse_args()
 
     input_files = args.input
@@ -1830,7 +1916,10 @@ def main():
             min_wind_kt=args.min_wind,
             min_duration=args.min_duration,
             enable_nursery_aggregation=args.nursery_aggregation,
-            max_nursery_dist=args.nursery_dist
+            max_nursery_dist=args.nursery_dist,
+            max_nursery_gap_h=args.nursery_gap_h,
+            min_motion_disp_km=args.min_motion_disp,
+            max_member_overlap=args.max_member_overlap
         )
 
         monitoring_df = wp_df[wp_df['storm_group'].str.startswith('monitoring_')].copy()
@@ -1938,6 +2027,34 @@ def main():
             os.makedirs(os.path.dirname(manifest_file), exist_ok=True)
             with open(manifest_file, 'w', encoding='utf-8') as mf:
                 json.dump(manifest_data, mf, indent=2)
+
+    # Rolling retention: retain up to the latest 8 unique runs (48 hours of continuous 6-hourly cycles).
+    # Ensures seamless cycling across calendar days (00Z -> 06Z -> 12Z -> 18Z -> 00Z) without manifest bloat.
+    try:
+        manifest_candidates = [
+            os.path.join(script_dir, 'public', 'data', 'spaghetti_manifest.json'),
+            os.path.join(os.getcwd(), 'public', 'data', 'spaghetti_manifest.json'),
+            os.path.join('public', 'data', 'spaghetti_manifest.json')
+        ]
+        manifest_file = next((m for m in manifest_candidates if os.path.exists(m)), None)
+        if manifest_file and os.path.exists(manifest_file):
+            with open(manifest_file, 'r', encoding='utf-8') as mf:
+                current_manifest = json.load(mf)
+            unique_runs = sorted(list(set(
+                f"{e.get('init_date', '20261008')}_{e.get('cycle', '00Z')}" for e in current_manifest
+            )), reverse=True)
+            MAX_RUNS_RETAINED = 8
+            if len(unique_runs) > MAX_RUNS_RETAINED:
+                retained_runs = set(unique_runs[:MAX_RUNS_RETAINED])
+                pruned_manifest = [
+                    e for e in current_manifest 
+                    if f"{e.get('init_date', '20261008')}_{e.get('cycle', '00Z')}" in retained_runs
+                ]
+                with open(manifest_file, 'w', encoding='utf-8') as mf:
+                    json.dump(pruned_manifest, mf, indent=2)
+                print(f"Rolling retention: pruned manifest to {len(pruned_manifest)} entries across {len(retained_runs)} active runs.")
+    except Exception as e:
+        print(f"Notice: manifest retention check completed with: {e}")
 
 if __name__ == '__main__':
     main()
