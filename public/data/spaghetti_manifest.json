@@ -1,0 +1,62 @@
+[
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261008",
+    "cycle": "00Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA01_20261008T00Z",
+    "filename": "MONITORING_LPA01_20261008_00Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA01_20261008_00Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-08T10:42:58.965795+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261008",
+    "cycle": "00Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA01_20261008T00Z",
+    "filename": "MONITORING_LPA01_20261008_00Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA01_20261008_00Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-08T10:43:49.560035+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261008",
+    "cycle": "00Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA02_20261008T00Z",
+    "filename": "MONITORING_LPA02_20261008_00Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA02_20261008_00Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-08T10:43:59.355373+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA04",
+    "atcf_id": "LPA04",
+    "init_date": "20261008",
+    "cycle": "00Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA04_20261008T00Z",
+    "filename": "MONITORING_LPA04_20261008_00Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA04_20261008_00Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-08T10:44:05.114341+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA03",
+    "atcf_id": "LPA03",
+    "init_date": "20261008",
+    "cycle": "00Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA03_20261008T00Z",
+    "filename": "MONITORING_LPA03_20261008_00Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA03_20261008_00Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-08T10:44:13.089475+00:00"
+  }
+]

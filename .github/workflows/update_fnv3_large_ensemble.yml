@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install matplotlib cartopy pandas numpy requests scikit-learn scipy
+          python -m pip install matplotlib cartopy pandas numpy requests scikit-learn scipy shapely
           if [ -f requirements_dev.txt ]; then pip install -r requirements_dev.txt; fi
 
       - name: Run FNV3 Large Ensemble forecast logic
@@ -71,10 +71,9 @@ jobs:
       - name: Obfuscate CSV Files
         run: python obfuscate_data.py
 
-      - name: Generate FNV3 Large Ensemble Trend Maps
+      - name: Generate Under-Monitoring LPA Spaghetti Graphics
         run: |
-          python generate_trends_map.py --dataset large --horizon 5day --all
-          python generate_trends_map.py --dataset large --horizon 15day --all
+          python plot_monitoring_spaghetti.py
 
       - name: Commit and push changes
         run: |
@@ -85,13 +84,13 @@ jobs:
           git add -u public/data/
 
           # Add forecast PNGs and the obfuscated files for browser use
-          git add public/assets/fnv3_*.png || true
+          git add public/assets/*.png || true
           git add -f public/data/fnv3_large_latest.enc || true
           git add -f public/data/fnv3_large_paired_latest.enc || true
           git add -f public/data/fnv3_large_*.enc || true
           git add -f public/data/fnv3_large_paired_*.enc || true
           git add -f public/data/cycles_manifest.json || true
-          git add public/data/trends/* || true
+          git add -f public/data/spaghetti_manifest.json || true
 
           # Commit if there are changes
           if git diff --staged --quiet; then

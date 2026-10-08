@@ -1,8 +1,82 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Maximize2,
+  Columns2,
+  HelpCircle,
+  Activity,
+  Command
+} from "lucide-react";
 import Navbar from "./Navbar";
 import "./Forecast.css";
+
+// Operational under-monitoring models configuration
+const CLUSTER_MODELS = [
+  { id: "gdm_wnc_large", name: "GDM WNC Large", shortName: "WNC Large", members: "1,001 Members", badge: "1001-ENS" },
+  { id: "gdm_wncv3", name: "GDM WNCv3", shortName: "WNCv3", members: "64 Members", badge: "64-ENS" }
+];
+
+// Clean formatting helper: renders technical IDs like 'MONITORING_LPA01' or 'LPA01' as 'Cluster 01'
+const formatClusterLabel = (id) => {
+  if (!id) return "Cluster 01";
+  const match = String(id).match(/(\d+)/);
+  if (match) {
+    const num = match[1].padStart(2, "0");
+    return `Cluster ${num}`;
+  }
+  const clean = String(id).replace(/^MONITORING_/i, "").replace(/^LPA_?/i, "").trim();
+  return clean ? `Cluster ${clean}` : "Cluster 01";
+};
+
+// Fallback seed entries in case manifest is fetching or temporarily offline
+const DEFAULT_CLUSTER_ENTRIES = [
+  {
+    storm_id: "MONITORING_LPA01",
+    atcf_id: "LPA01",
+    init_date: "20261008",
+    cycle: "00Z",
+    model: "gdm_wnc_large",
+    filename: "MONITORING_LPA01_20261008_00Z_gdm_wnc_large.png"
+  },
+  {
+    storm_id: "MONITORING_LPA01",
+    atcf_id: "LPA01",
+    init_date: "20261008",
+    cycle: "00Z",
+    model: "gdm_wncv3",
+    filename: "MONITORING_LPA01_20261008_00Z_gdm_wncv3.png"
+  },
+  {
+    storm_id: "MONITORING_LPA02",
+    atcf_id: "LPA02",
+    init_date: "20261008",
+    cycle: "00Z",
+    model: "gdm_wnc_large",
+    filename: "MONITORING_LPA02_20261008_00Z_gdm_wnc_large.png"
+  },
+  {
+    storm_id: "MONITORING_LPA04",
+    atcf_id: "LPA04",
+    init_date: "20261008",
+    cycle: "00Z",
+    model: "gdm_wnc_large",
+    filename: "MONITORING_LPA04_20261008_00Z_gdm_wnc_large.png"
+  },
+  {
+    storm_id: "MONITORING_LPA03",
+    atcf_id: "LPA03",
+    init_date: "20261008",
+    cycle: "00Z",
+    model: "gdm_wnc_large",
+    filename: "MONITORING_LPA03_20261008_00Z_gdm_wnc_large.png"
+  }
+];
 
 // Helper to resolve asset URLs relative to the base path in both local development and deployed production (subfolder) environments
 const getAssetUrl = (path) => {
@@ -316,10 +390,34 @@ const Forecast = () => {
       });
   }, []);
 
-  const [selectedType, setSelectedType] = useState("5day"); // '5day' or '15day'
+  const [selectedType, setSelectedType] = useState("5day"); // '5day' | '15day' | 'cluster'
   const [selectedModelTime, setSelectedModelTime] = useState(allPossibleCycles[0]);
   const [expandedSpecs, setExpandedSpecs] = useState(null);
   const [hasManuallySelected, setHasManuallySelected] = useState(false);
+
+  // Cluster Monitoring Specific States
+  const [clusterManifest, setClusterManifest] = useState(DEFAULT_CLUSTER_ENTRIES);
+  const [clusterModel, setClusterModel] = useState("gdm_wnc_large"); // 'gdm_wnc_large' | 'gdm_wncv3'
+  const [selectedClusterId, setSelectedClusterId] = useState("LPA01");
+  const [isClusterSplitView, setIsClusterSplitView] = useState(false);
+  const [showClusterHelp, setShowClusterHelp] = useState(false);
+
+  // Fetch real-time Under-Monitoring Cluster Manifest
+  useEffect(() => {
+    fetch(getAssetUrl("/data/spaghetti_manifest.json"))
+      .then((res) => {
+        if (res.ok) return res.json();
+        return null;
+      })
+      .then((json) => {
+        if (Array.isArray(json) && json.length > 0) {
+          setClusterManifest(json);
+          const firstLpa = json[0].atcf_id || json[0].storm_id;
+          if (firstLpa) setSelectedClusterId(firstLpa);
+        }
+      })
+      .catch(() => { });
+  }, []);
 
   // Zoom & Pan Lightbox States
   const [lightboxData, setLightboxData] = useState(null); // { src, title }
@@ -334,72 +432,21 @@ const Forecast = () => {
 
   const canvasRef = useRef(null);
 
-  const [showTrends, setShowTrends] = useState(false);
-  const [trendsManifest, setTrendsManifest] = useState(null);
-  const [activeTrendDistId, setActiveTrendDistId] = useState(null);
-  const [isWideTrend, setIsWideTrend] = useState(false);
-  const [trendHorizon, setTrendHorizon] = useState("5day");
-
-  // Automatically sync/default the trend horizon when model changes
+  // Reset view modes when selected model changes
   useEffect(() => {
-    setTrendHorizon(selectedModel === "fnv3_large" ? "15day" : "5day");
-  }, [selectedModel]);
-
-  useEffect(() => {
-    if (showTrends && !trendsManifest) {
-      fetch(getAssetUrl("/data/trends/manifest.json"))
-        .then(res => {
-          if (res.ok) return res.json();
-          throw new Error("Failed to load trends manifest");
-        })
-        .then(data => {
-          setTrendsManifest(data);
-          const key = `${selectedModel === "fnv3_large" ? "large" : "base"}_${trendHorizon}`;
-          const dists = data[key] || [];
-          if (dists.length > 0) {
-            setActiveTrendDistId(dists[0].id);
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          setTrendsManifest({});
-        });
-    }
-  }, [showTrends, selectedModel, trendHorizon, trendsManifest]);
-
-  // Disable trends view if selected model is changed to one that does not support it
-  useEffect(() => {
-    if (selectedModel !== "fnv3_base" && selectedModel !== "fnv3_large") {
-      setShowTrends(false);
-      setShowForecastTrack(false);
-    } else {
-      setShowForecastTrack(false);
-    }
+    setShowForecastTrack(false);
     if (selectedModel !== "fnv3_large") {
       setShowClusters(false);
     }
     setSelectedStormId("latest");
   }, [selectedModel]);
 
-  // Disable trends view if isCompareGrid is turned on
+  // Disable forecast track when compare grid is active
   useEffect(() => {
     if (isCompareGrid) {
-      setShowTrends(false);
       setShowForecastTrack(false);
     }
   }, [isCompareGrid]);
-
-  useEffect(() => {
-    if (trendsManifest) {
-      const key = `${selectedModel === "fnv3_large" ? "large" : "base"}_${trendHorizon}`;
-      const dists = trendsManifest[key] || [];
-      if (dists.length > 0) {
-        setActiveTrendDistId(dists[0].id);
-      } else {
-        setActiveTrendDistId(null);
-      }
-    }
-  }, [selectedModel, trendHorizon, trendsManifest]);
 
   // Preload and verify image availability on mount
   useEffect(() => {
@@ -497,8 +544,122 @@ const Forecast = () => {
       .filter((item) => item.track && item.track.imageSrc);
   }, [modelsList, selectedType, selectedModelTime, selectedStormId, availableIds, showForecastTrack, showClusters]);
 
+  // Total unique disturbances monitored across all ensemble models
+  const totalClustersCount = useMemo(() => {
+    const ids = new Set(clusterManifest.map((item) => item.atcf_id || item.storm_id));
+    return ids.size;
+  }, [clusterManifest]);
+
+  // Derived cluster lists formatted as 'Cluster 01', 'Cluster 02', etc.
+  // In single view, strictly show only the clusters detected by the currently active model!
+  const availableClusterList = useMemo(() => {
+    const targetItems = isClusterSplitView
+      ? clusterManifest
+      : clusterManifest.filter((m) => m.model === clusterModel);
+
+    const map = new Map();
+    targetItems.forEach((item) => {
+      const key = item.atcf_id || item.storm_id;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          label: formatClusterLabel(key),
+          fullName: formatClusterLabel(key),
+          models: []
+        });
+      }
+      map.get(key).models.push(item.model);
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [clusterManifest, clusterModel, isClusterSplitView]);
+
+  const activeClusterItem = useMemo(() => {
+    if (!clusterManifest.length) return null;
+    let match = clusterManifest.find(
+      (m) => m.model === clusterModel && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
+    );
+    if (!match) {
+      match = clusterManifest.find((m) => m.model === clusterModel);
+    }
+    if (!match) {
+      match = clusterManifest[0];
+    }
+    return match;
+  }, [clusterManifest, clusterModel, selectedClusterId]);
+
+  // When in single model view, keep selectedClusterId synchronized with clusterModel and availableClusterList
+  useEffect(() => {
+    if (selectedType === "cluster" && !isClusterSplitView && availableClusterList.length > 0) {
+      const exists = availableClusterList.some((c) => c.id === selectedClusterId);
+      if (!exists) {
+        setSelectedClusterId(availableClusterList[0].id);
+      }
+    }
+  }, [selectedType, isClusterSplitView, clusterModel, availableClusterList, selectedClusterId]);
+
+  const splitV3Item = useMemo(() => {
+    return (
+      clusterManifest.find(
+        (m) => m.model === "gdm_wncv3" && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
+      ) || null
+    );
+  }, [clusterManifest, selectedClusterId]);
+
+  const splitLargeItem = useMemo(() => {
+    return (
+      clusterManifest.find(
+        (m) => m.model === "gdm_wnc_large" && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
+      ) || null
+    );
+  }, [clusterManifest, selectedClusterId]);
+
+  const handleNextCluster = useCallback(() => {
+    if (!availableClusterList.length) return;
+    const currIdx = availableClusterList.findIndex((c) => c.id === selectedClusterId);
+    const nextIdx = (currIdx + 1) % availableClusterList.length;
+    setSelectedClusterId(availableClusterList[nextIdx].id);
+  }, [availableClusterList, selectedClusterId]);
+
+  const handlePrevCluster = useCallback(() => {
+    if (!availableClusterList.length) return;
+    const currIdx = availableClusterList.findIndex((c) => c.id === selectedClusterId);
+    const prevIdx = (currIdx - 1 + availableClusterList.length) % availableClusterList.length;
+    setSelectedClusterId(availableClusterList[prevIdx].id);
+  }, [availableClusterList, selectedClusterId]);
+
+  const openClusterLightbox = (item) => {
+    if (!item) return;
+    const src = getAssetUrl(`/assets/${item.filename}`);
+    const title = `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`;
+    setLightboxData({
+      src,
+      title,
+      isCluster: true,
+      item
+    });
+    setLightboxIndex(clusterManifest.findIndex((m) => m.filename === item.filename));
+    setZoomScale(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
   const handlePrevLightbox = (e) => {
     if (e) e.stopPropagation();
+    if (lightboxData?.isCluster && clusterManifest.length > 0 && lightboxIndex !== null) {
+      const prevIdx = (lightboxIndex - 1 + clusterManifest.length) % clusterManifest.length;
+      const prevItem = clusterManifest[prevIdx];
+      setLightboxIndex(prevIdx);
+      setLightboxData({
+        src: getAssetUrl(`/assets/${prevItem.filename}`),
+        title: `${formatClusterLabel(prevItem.atcf_id || prevItem.storm_id)} • ${prevItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${prevItem.cycle || "00Z"})`,
+        isCluster: true,
+        item: prevItem
+      });
+      setZoomScale(1);
+      setPanX(0);
+      setPanY(0);
+      return;
+    }
     if (availableGridItems.length > 0 && lightboxIndex !== null) {
       const prevIdx = (lightboxIndex - 1 + availableGridItems.length) % availableGridItems.length;
       const prevItem = availableGridItems[prevIdx];
@@ -515,6 +676,21 @@ const Forecast = () => {
 
   const handleNextLightbox = (e) => {
     if (e) e.stopPropagation();
+    if (lightboxData?.isCluster && clusterManifest.length > 0 && lightboxIndex !== null) {
+      const nextIdx = (lightboxIndex + 1) % clusterManifest.length;
+      const nextItem = clusterManifest[nextIdx];
+      setLightboxIndex(nextIdx);
+      setLightboxData({
+        src: getAssetUrl(`/assets/${nextItem.filename}`),
+        title: `${formatClusterLabel(nextItem.atcf_id || nextItem.storm_id)} • ${nextItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${nextItem.cycle || "00Z"})`,
+        isCluster: true,
+        item: nextItem
+      });
+      setZoomScale(1);
+      setPanX(0);
+      setPanY(0);
+      return;
+    }
     if (availableGridItems.length > 0 && lightboxIndex !== null) {
       const nextIdx = (lightboxIndex + 1) % availableGridItems.length;
       const nextItem = availableGridItems[nextIdx];
@@ -553,6 +729,26 @@ const Forecast = () => {
     setPanY(0);
   }, []);
 
+  // Mobile Touch Swipe Handlers for Cluster Card
+  const clusterTouchStartRef = useRef(null);
+  const handleClusterTouchStart = (e) => {
+    if (e.touches && e.touches.length === 1) {
+      clusterTouchStartRef.current = e.touches[0].clientX;
+    }
+  };
+
+  const handleClusterTouchEnd = (e) => {
+    if (clusterTouchStartRef.current !== null && e.changedTouches && e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - clusterTouchStartRef.current;
+      clusterTouchStartRef.current = null;
+      if (deltaX < -45) {
+        handleNextCluster();
+      } else if (deltaX > 45) {
+        handlePrevCluster();
+      }
+    }
+  };
+
   // Touch Swipe navigation handlers for Lightbox modal
   const handleLightboxTouchStart = (e) => {
     if (e.touches && e.touches.length === 1) {
@@ -574,18 +770,112 @@ const Forecast = () => {
     }
   };
 
-  // Keyboard navigation listener (ArrowLeft / ArrowRight / Escape)
+  // Comprehensive Global Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Ignore if user is interacting with form controls
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+
+      // Handle Lightbox keyboard shortcuts when open
       if (lightboxData) {
-        if (e.key === "ArrowLeft") handlePrevLightbox();
-        if (e.key === "ArrowRight") handleNextLightbox();
-        if (e.key === "Escape") closeLightbox();
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          handlePrevLightbox();
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          handleNextLightbox();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closeLightbox();
+        } else if (e.key === "+" || e.key === "=") {
+          e.preventDefault();
+          setZoomScale((prev) => Math.min(prev + 0.5, 4));
+        } else if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          setZoomScale((prev) => Math.max(prev - 0.5, 1));
+        } else if (e.key === "0" || e.key.toLowerCase() === "r") {
+          e.preventDefault();
+          setZoomScale(1);
+          setPanX(0);
+          setPanY(0);
+        }
+        return;
+      }
+
+      // Help Modal Shortcuts
+      if (showClusterHelp) {
+        if (e.key === "Escape" || e.key === "?") {
+          e.preventDefault();
+          setShowClusterHelp(false);
+          return;
+        }
+      }
+
+      const keyLower = e.key.toLowerCase();
+
+      // Quick toggle for Cluster horizon: 'c' toggles cluster mode
+      if (keyLower === "c") {
+        e.preventDefault();
+        setSelectedType((prev) => (prev === "cluster" ? "5day" : "cluster"));
+        return;
+      }
+
+      // Toggle shortcuts cheatsheet
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowClusterHelp((prev) => !prev);
+        return;
+      }
+
+      // In Cluster Mode Specific Shortcuts
+      if (selectedType === "cluster") {
+        if (keyLower === "m" || e.key === "Tab") {
+          e.preventDefault();
+          setClusterModel((prev) => (prev === "gdm_wnc_large" ? "gdm_wncv3" : "gdm_wnc_large"));
+        } else if (keyLower === "d") {
+          e.preventDefault();
+          setIsClusterSplitView((prev) => !prev);
+        } else if (e.key === "ArrowLeft" || e.key === "[") {
+          e.preventDefault();
+          handlePrevCluster();
+        } else if (e.key === "ArrowRight" || e.key === "]") {
+          e.preventDefault();
+          handleNextCluster();
+        } else if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(e.key)) {
+          const numIdx = parseInt(e.key, 10) - 1;
+          if (availableClusterList[numIdx]) {
+            e.preventDefault();
+            setSelectedClusterId(availableClusterList[numIdx].id);
+          }
+        } else if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          if (activeClusterItem) {
+            openClusterLightbox(activeClusterItem);
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setSelectedType("5day");
+        }
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [lightboxData, lightboxIndex, availableGridItems, closeLightbox]);
+  }, [
+    lightboxData,
+    lightboxIndex,
+    availableGridItems,
+    closeLightbox,
+    selectedType,
+    showClusterHelp,
+    clusterModel,
+    selectedClusterId,
+    availableClusterList,
+    activeClusterItem,
+    clusterManifest,
+    handleNextCluster,
+    handlePrevCluster
+  ]);
 
   const hasDataForCycle = (cycleTime) => {
     if (isCompareGrid) {
@@ -725,19 +1015,6 @@ const Forecast = () => {
                   Spaghetti Plot Map
                 </Link>
 
-                {/* Run Cycle Trends comparison button */}
-                {(selectedModel === "fnv3_base" || selectedModel === "fnv3_large") && (
-                  <button
-                    onClick={() => setShowTrends(!showTrends)}
-                    className={`btn-interactive ${showTrends ? "active" : ""}`}
-                    style={showTrends ? { borderColor: "var(--accent-color)", boxShadow: "0 0 10px rgba(0, 240, 255, 0.25)" } : {}}
-                  >
-                    <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    {showTrends ? "Close Trends" : "Run Cycle Trend"}
-                  </button>
-                )}
 
                 {/* Grid Comparison Mode Toggle */}
                 <button
@@ -762,8 +1039,13 @@ const Forecast = () => {
                   {modelsList.map((model) => (
                     <button
                       key={model.id}
-                      onClick={() => setSelectedModel(model.id)}
-                      className={`toggle-btn ${selectedModel === model.id ? "active" : ""}`}
+                      onClick={() => {
+                        setSelectedModel(model.id);
+                        if (selectedType === "cluster") {
+                          setSelectedType("5day");
+                        }
+                      }}
+                      className={`toggle-btn ${selectedModel === model.id && selectedType !== "cluster" ? "active" : ""}`}
                     >
                       {model.name}
                     </button>
@@ -771,178 +1053,422 @@ const Forecast = () => {
                 </div>
               )}
 
-              {/* Forecast Horizon (5-Day / 15-Day Selector) */}
+              {/* Forecast Horizon (5-Day / 15-Day / Cluster Selector) */}
               <div className="horizon-selector">
                 <button
                   onClick={() => setSelectedType("5day")}
                   className={`horizon-btn ${selectedType === "5day" ? "active" : ""}`}
                 >
-                  5-Day Forecast
+                  <span>5-Day</span><span className="horizon-btn-extra"> Forecast</span>
                 </button>
                 <button
                   onClick={() => setSelectedType("15day")}
                   className={`horizon-btn ${selectedType === "15day" ? "active" : ""}`}
                 >
-                  15-Day Forecast
+                  <span>15-Day</span><span className="horizon-btn-extra"> Forecast</span>
+                </button>
+                <button
+                  onClick={() => setSelectedType("cluster")}
+                  className={`horizon-btn horizon-cluster-btn ${selectedType === "cluster" ? "active" : ""}`}
+                  title="Under-Monitoring LPA & Track Clusters (Press 'C')"
+                >
+                  <span className="cluster-radar-pulse" />
+                  <span>Cluster</span>
+                  <span className="cluster-badge-count">{totalClustersCount || "Live"}</span>
+                  <kbd className="cluster-kbd-tag">C</kbd>
                 </button>
               </div>
 
             </div>
           </header>
 
-          {/* Timeline Run Selector Carousel */}
-          {!showTrends && (
+          {/* Timeline Run Selector Carousel (Hidden in Cluster tracking mode) */}
+          {selectedType !== "cluster" && (
             <div className="timeline-carousel-container">
-              <div className="timeline-carousel-header">
-                <span>Model Run Cycles Timeline</span>
-                <span>All Times PHST (UTC+8)</span>
-              </div>
-              <div className="timeline-track-wrapper">
-                <div className="timeline-track">
-                  {allPossibleCycles.map((cycleTime) => {
-                    const isActive = selectedModelTime === cycleTime;
-                    const hasData = hasDataForCycle(cycleTime);
-                    const timeStr = toPhstLabel(cycleTime);
-                    const dateStr = toPrettyDate(cycleTime);
-                    const utcLabel = `${cycleTime.split("T")[1].slice(0, 2)}Z`;
-
-                    return (
-                      <div
-                        key={cycleTime}
-                        onClick={() => {
-                          setSelectedModelTime(cycleTime);
-                          setHasManuallySelected(true);
-                        }}
-                        className={`timeline-node ${isActive ? "active" : ""}`}
-                        style={!hasData ? { opacity: 0.5, borderStyle: "dashed" } : {}}
-                      >
-                        <span className="timeline-node-date">{dateStr}</span>
-                        <span className="timeline-node-time">{timeStr}</span>
-                        <div className="timeline-node-badge">
-                          {utcLabel} {!hasData && "(Pending)"}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {((selectedModel === "fnv3_base" || selectedModel === "fnv3_large") && !isCompareGrid) && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
-                    View Mode:
-                  </span>
-                  <div style={{ display: "flex", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                    <button
-                      onClick={() => { setShowClusters(false); setShowForecastTrack(false); }}
-                      className={`toggle-btn ${(!showClusters && !showForecastTrack) ? "active" : ""}`}
-                      style={{
-                        padding: "0.25rem 0.5rem",
-                        borderRadius: "0.35rem",
-                        fontSize: "0.7rem",
-                        fontWeight: "900",
-                        cursor: "pointer",
-                        border: "none",
-                        backgroundColor: (!showClusters && !showForecastTrack) ? "var(--bg-light)" : "transparent",
-                        color: (!showClusters && !showForecastTrack) ? "var(--accent-color)" : "var(--text-muted)",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      STANDARD OUTLOOK
-                    </button>
-                    {selectedModel === "fnv3_large" && (
-                      <button
-                        onClick={() => { setShowClusters(true); setShowForecastTrack(false); }}
-                        className={`toggle-btn ${showClusters ? "active" : ""}`}
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          borderRadius: "0.35rem",
-                          fontSize: "0.7rem",
-                          fontWeight: "900",
-                          cursor: "pointer",
-                          border: "none",
-                          backgroundColor: showClusters ? "var(--bg-light)" : "transparent",
-                          color: showClusters ? "var(--accent-color)" : "var(--text-muted)",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        TRACK CLUSTERS
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setShowClusters(false); setShowForecastTrack(true); }}
-                      className={`toggle-btn ${showForecastTrack ? "active" : ""}`}
-                      style={{
-                        padding: "0.25rem 0.5rem",
-                        borderRadius: "0.35rem",
-                        fontSize: "0.7rem",
-                        fontWeight: "900",
-                        cursor: "pointer",
-                        border: "none",
-                        backgroundColor: showForecastTrack ? "var(--bg-light)" : "transparent",
-                        color: showForecastTrack ? "var(--accent-color)" : "var(--text-muted)",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      FORECAST TRACK
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {showForecastTrack && stormsIndex.length > 0 && !isCompareGrid && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
-                    Storm Track:
-                  </span>
-                  <div style={{ display: "flex", flexWrap: "wrap", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)", gap: "0.25rem" }}>
-                    <button
-                      onClick={() => setSelectedStormId("latest")}
-                      className={`toggle-btn ${selectedStormId === "latest" ? "active" : ""}`}
-                      style={{
-                        padding: "0.25rem 0.5rem",
-                        borderRadius: "0.35rem",
-                        fontSize: "0.7rem",
-                        fontWeight: "900",
-                        cursor: "pointer",
-                        border: "none",
-                        backgroundColor: selectedStormId === "latest" ? "var(--bg-light)" : "transparent",
-                        color: selectedStormId === "latest" ? "var(--accent-color)" : "var(--text-muted)",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      ALL SYSTEMS (COMPOSITE)
-                    </button>
-                    {stormsIndex.map((storm) => (
-                      <button
-                        key={storm.track_id}
-                        onClick={() => setSelectedStormId(storm.track_id)}
-                        className={`toggle-btn ${selectedStormId === storm.track_id ? "active" : ""}`}
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          borderRadius: "0.35rem",
-                          fontSize: "0.7rem",
-                          fontWeight: "900",
-                          cursor: "pointer",
-                          border: "none",
-                          backgroundColor: selectedStormId === storm.track_id ? "var(--bg-light)" : "transparent",
-                          color: selectedStormId === storm.track_id ? "var(--accent-color)" : "var(--text-muted)",
-                          transition: "all 0.2s"
-                        }}
-                      >
-                        {storm.storm_name.toUpperCase()} ({storm.track_id})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="timeline-carousel-header">
+              <span>Model Run Cycles Timeline</span>
+              <span>All Times PHST (UTC+8)</span>
             </div>
+            <div className="timeline-track-wrapper">
+              <div className="timeline-track">
+                {allPossibleCycles.map((cycleTime) => {
+                  const isActive = selectedModelTime === cycleTime;
+                  const hasData = hasDataForCycle(cycleTime);
+                  const timeStr = toPhstLabel(cycleTime);
+                  const dateStr = toPrettyDate(cycleTime);
+                  const utcLabel = `${cycleTime.split("T")[1].slice(0, 2)}Z`;
+
+                  return (
+                    <div
+                      key={cycleTime}
+                      onClick={() => {
+                        setSelectedModelTime(cycleTime);
+                        setHasManuallySelected(true);
+                      }}
+                      className={`timeline-node ${isActive ? "active" : ""}`}
+                      style={!hasData ? { opacity: 0.5, borderStyle: "dashed" } : {}}
+                    >
+                      <span className="timeline-node-date">{dateStr}</span>
+                      <span className="timeline-node-time">{timeStr}</span>
+                      <div className="timeline-node-badge">
+                        {utcLabel} {!hasData && "(Pending)"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {((selectedModel === "fnv3_base" || selectedModel === "fnv3_large") && !isCompareGrid) && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+                <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
+                  View Mode:
+                </span>
+                <div style={{ display: "flex", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                  <button
+                    onClick={() => { setShowClusters(false); setShowForecastTrack(false); }}
+                    className={`toggle-btn ${(!showClusters && !showForecastTrack) ? "active" : ""}`}
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      borderRadius: "0.35rem",
+                      fontSize: "0.7rem",
+                      fontWeight: "900",
+                      cursor: "pointer",
+                      border: "none",
+                      backgroundColor: (!showClusters && !showForecastTrack) ? "var(--bg-light)" : "transparent",
+                      color: (!showClusters && !showForecastTrack) ? "var(--accent-color)" : "var(--text-muted)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    STANDARD OUTLOOK
+                  </button>
+                  {selectedModel === "fnv3_large" && (
+                    <button
+                      onClick={() => { setShowClusters(true); setShowForecastTrack(false); }}
+                      className={`toggle-btn ${showClusters ? "active" : ""}`}
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        borderRadius: "0.35rem",
+                        fontSize: "0.7rem",
+                        fontWeight: "900",
+                        cursor: "pointer",
+                        border: "none",
+                        backgroundColor: showClusters ? "var(--bg-light)" : "transparent",
+                        color: showClusters ? "var(--accent-color)" : "var(--text-muted)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      TRACK CLUSTERS
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setShowClusters(false); setShowForecastTrack(true); }}
+                    className={`toggle-btn ${showForecastTrack ? "active" : ""}`}
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      borderRadius: "0.35rem",
+                      fontSize: "0.7rem",
+                      fontWeight: "900",
+                      cursor: "pointer",
+                      border: "none",
+                      backgroundColor: showForecastTrack ? "var(--bg-light)" : "transparent",
+                      color: showForecastTrack ? "var(--accent-color)" : "var(--text-muted)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    FORECAST TRACK
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showForecastTrack && stormsIndex.length > 0 && !isCompareGrid && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "900", color: "var(--text-muted)", paddingLeft: "0.25rem" }}>
+                  Storm Track:
+                </span>
+                <div style={{ display: "flex", flexWrap: "wrap", backgroundColor: "var(--bg-dark)", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid rgba(255, 255, 255, 0.05)", gap: "0.25rem" }}>
+                  <button
+                    onClick={() => setSelectedStormId("latest")}
+                    className={`toggle-btn ${selectedStormId === "latest" ? "active" : ""}`}
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      borderRadius: "0.35rem",
+                      fontSize: "0.7rem",
+                      fontWeight: "900",
+                      cursor: "pointer",
+                      border: "none",
+                      backgroundColor: selectedStormId === "latest" ? "var(--bg-light)" : "transparent",
+                      color: selectedStormId === "latest" ? "var(--accent-color)" : "var(--text-muted)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    ALL SYSTEMS (COMPOSITE)
+                  </button>
+                  {stormsIndex.map((storm) => (
+                    <button
+                      key={storm.track_id}
+                      onClick={() => setSelectedStormId(storm.track_id)}
+                      className={`toggle-btn ${selectedStormId === storm.track_id ? "active" : ""}`}
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        borderRadius: "0.35rem",
+                        fontSize: "0.7rem",
+                        fontWeight: "900",
+                        cursor: "pointer",
+                        border: "none",
+                        backgroundColor: selectedStormId === storm.track_id ? "var(--bg-light)" : "transparent",
+                        color: selectedStormId === storm.track_id ? "var(--accent-color)" : "var(--text-muted)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {storm.storm_name.toUpperCase()} ({storm.track_id})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           )}
 
           {/* Dashboard Panels */}
-          <div className={`forecast-grid ${isCompareGrid ? "compare-active" : ""}`}>
+          <div className={`forecast-grid ${isCompareGrid && selectedType !== "cluster" ? "compare-active" : ""}`}>
 
-            {/* Comparison Grid mode view */}
-            {isCompareGrid ? (
+            {/* Cluster Under-Monitoring Showcase Mode */}
+            {selectedType === "cluster" ? (
+              <div className="panel cluster-panel">
+                {/* Cluster Toolbar */}
+                <div className="cluster-toolbar">
+                  <div className="cluster-title-group">
+                    <div className="cluster-status-pill">
+                      <span className="cluster-status-dot" />
+                      <span>UNDER MONITORING SIGNALS</span>
+                    </div>
+                    <h3 className="cluster-main-title">
+                      {isClusterSplitView
+                        ? `Dual Model Comparison • ${formatClusterLabel(selectedClusterId)}`
+                        : `${formatClusterLabel(activeClusterItem?.atcf_id || activeClusterItem?.storm_id || selectedClusterId)}`}
+                    </h3>
+                    <span className="cluster-subtitle">
+                      AI Cyclogenesis Ensemble Spaghetti Tracking • PAR / WestPac Area
+                    </span>
+                  </div>
+
+                  <div className="cluster-actions-group">
+                    {/* Model Segmented Control (Active in Single View) */}
+                    {!isClusterSplitView && (
+                      <div className="cluster-model-segmented">
+                        {CLUSTER_MODELS.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => setClusterModel(m.id)}
+                            className={`cluster-seg-btn ${clusterModel === m.id ? "active" : ""}`}
+                            title={`Switch to ${m.name} (Key: M)`}
+                          >
+                            <span className="seg-name-full">{m.name}</span>
+                            <span className="seg-name-short">{m.shortName}</span>
+                            <span className="seg-badge">{m.badge}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Secondary Actions (Side-by-side & Help) */}
+                    <div className="cluster-secondary-actions">
+                      <button
+                        onClick={() => setIsClusterSplitView((prev) => !prev)}
+                        className={`cluster-tool-btn cluster-split-toggle-btn ${isClusterSplitView ? "active" : ""}`}
+                        title="Toggle Dual Side-by-Side View (Key: D)"
+                      >
+                        <Columns2 size={14} />
+                        <span>{isClusterSplitView ? "Single View" : "Side-by-Side"}</span>
+                        <kbd className="kbd-mini">D</kbd>
+                      </button>
+
+                      <button
+                        onClick={() => setShowClusterHelp(true)}
+                        className="cluster-tool-btn cluster-tool-icon-only"
+                        title="Keyboard Shortcuts & Gestures (Key: ?)"
+                      >
+                        <HelpCircle size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Disturbance Cluster Selector Chips */}
+                {availableClusterList.length > 0 && (
+                  <div className="cluster-lpa-strip">
+                    <div className="cluster-strip-label">
+                      <Activity size={13} />
+                      <span>Clusters:</span>
+                    </div>
+                    <div className="cluster-chips-scroll">
+                      {availableClusterList.map((c, idx) => {
+                        const isSelected = selectedClusterId === c.id;
+                        const hasInCurrentModel = c.models.includes(clusterModel);
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              setSelectedClusterId(c.id);
+                              if (!isClusterSplitView && !hasInCurrentModel && c.models.length > 0) {
+                                setClusterModel(c.models[0]);
+                              }
+                            }}
+                            className={`cluster-lpa-chip ${isSelected ? "active" : ""}`}
+                            title={`View ${c.label} (Key: ${idx + 1})`}
+                          >
+                            <span className="chip-indicator" />
+                            <span className="chip-name">{c.label}</span>
+                            <kbd className="chip-kbd">{idx + 1}</kbd>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Main Visual Display Area */}
+                {isClusterSplitView ? (
+                  /* Dual Side-by-Side View */
+                  <div className="cluster-split-container">
+                    {/* WNCv3 Card */}
+                    <div className="cluster-split-card">
+                      <div className="cluster-split-header">
+                        <div className="split-model-tag v3-tag">GDM WNCv3</div>
+                        <span className="split-storm-tag">{formatClusterLabel(selectedClusterId)}</span>
+                        <span className="split-members-tag">{splitV3Item ? "64 Members" : "No Detection (0/64)"}</span>
+                      </div>
+                      <div
+                        className={`cluster-image-wrapper split-image-wrap ${!splitV3Item ? "no-signal-wrap" : ""}`}
+                        onClick={() => splitV3Item && openClusterLightbox(splitV3Item)}
+                      >
+                        {splitV3Item ? (
+                          <>
+                            <img
+                              src={getAssetUrl(`/assets/${splitV3Item.filename}`)}
+                              alt="GDM WNCv3 Monitoring Plot"
+                              className="cluster-img"
+                            />
+                            <div className="cluster-hover-hint">
+                              <Maximize2 size={16} />
+                              <span>Click to Expand Lightbox</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="cluster-empty-signal">
+                            <div className="empty-signal-icon-ring">
+                              <Activity size={24} className="empty-signal-icon" />
+                            </div>
+                            <h4>No WNCv3 Signal</h4>
+                            <p>
+                              <strong>{formatClusterLabel(selectedClusterId)}</strong> did not meet the cyclogenesis threshold in GDM WNCv3 (64-ENS).
+                            </p>
+                            <span className="empty-signal-badge">
+                              Detected exclusively by GDM WNC Large (1,001-ENS)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* WNC Large Card */}
+                    <div className="cluster-split-card">
+                      <div className="cluster-split-header">
+                        <div className="split-model-tag large-tag">GDM WNC Large</div>
+                        <span className="split-storm-tag">{formatClusterLabel(selectedClusterId)}</span>
+                        <span className="split-members-tag">{splitLargeItem ? "1,001 Members" : "No Detection (0/1001)"}</span>
+                      </div>
+                      <div
+                        className={`cluster-image-wrapper split-image-wrap ${!splitLargeItem ? "no-signal-wrap" : ""}`}
+                        onClick={() => splitLargeItem && openClusterLightbox(splitLargeItem)}
+                      >
+                        {splitLargeItem ? (
+                          <>
+                            <img
+                              src={getAssetUrl(`/assets/${splitLargeItem.filename}`)}
+                              alt="GDM WNC Large Monitoring Plot"
+                              className="cluster-img"
+                            />
+                            <div className="cluster-hover-hint">
+                              <Maximize2 size={16} />
+                              <span>Click to Expand Lightbox</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="cluster-empty-signal">
+                            <div className="empty-signal-icon-ring">
+                              <Activity size={24} className="empty-signal-icon" />
+                            </div>
+                            <h4>No WNC Large Signal</h4>
+                            <p>
+                              <strong>{formatClusterLabel(selectedClusterId)}</strong> did not meet the threshold in GDM WNC Large.
+                            </p>
+                            <span className="empty-signal-badge">
+                              Detected by GDM WNCv3 (64-ENS)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Single Active Model Card with Mobile Swipe */
+                  <div
+                    className="cluster-single-card"
+                    onTouchStart={handleClusterTouchStart}
+                    onTouchEnd={handleClusterTouchEnd}
+                  >
+                    <div
+                      className="cluster-image-wrapper"
+                      onClick={() => activeClusterItem && openClusterLightbox(activeClusterItem)}
+                    >
+                      {activeClusterItem ? (
+                        <img
+                          src={getAssetUrl(`/assets/${activeClusterItem.filename}`)}
+                          alt={`Monitoring plot for ${formatClusterLabel(activeClusterItem.atcf_id || activeClusterItem.storm_id)}`}
+                          className="cluster-img"
+                        />
+                      ) : (
+                        <div className="empty-state">
+                          <span>No monitoring graphic available for this selection.</span>
+                        </div>
+                      )}
+                      <div className="cluster-hover-hint">
+                        <Maximize2 size={16} />
+                        <span>Click to Zoom & Pan (or Press Space)</span>
+                      </div>
+                    </div>
+
+                    {/* Mobile Swipe Guidance and Quick Stepper */}
+                    <div className="cluster-mobile-bar">
+                      <button
+                        onClick={handlePrevCluster}
+                        className="mobile-stepper-btn"
+                        disabled={availableClusterList.length <= 1}
+                      >
+                        <ChevronLeft size={16} />
+                        <span>Prev</span>
+                      </button>
+
+                      <div className="mobile-swipe-indicator">
+                        <span>{formatClusterLabel(selectedClusterId)} • Swipe image or tap buttons</span>
+                      </div>
+
+                      <button
+                        onClick={handleNextCluster}
+                        className="mobile-stepper-btn"
+                        disabled={availableClusterList.length <= 1}
+                      >
+                        <span>Next</span>
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : isCompareGrid ? (
+              /* Comparison Grid mode view */
               <div className="comparison-grid">
                 {modelsList.map((model) => {
                   const track = getModelTrackData(model.id);
@@ -979,230 +1505,81 @@ const Forecast = () => {
               </div>
             ) : (
 
-              /* Single Model Mode View (Forecast Map or Trends Map) */
+              /* Single Model Mode View (Forecast Map) */
               <div className="panel image-panel">
                 <div className="panel-header">
-                  <span>{showTrends ? "Run Cycle Forecast Trends Map" : (currentTrack ? `${currentTrack.name} (${selectedType.toUpperCase()})` : "Forecast map")}</span>
+                  <span>{currentTrack ? `${currentTrack.name} (${selectedType.toUpperCase()})` : "Forecast map"}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    {showTrends && (
-                      <button
-                        onClick={() => setShowTrends(false)}
-                        className="trends-back-btn"
-                      >
-                        <svg className="icon" style={{ width: "0.8rem", height: "0.8rem", stroke: "currentColor" }} fill="none" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        <span>Back to Forecast</span>
-                      </button>
-                    )}
                     <span className="mono-badge">
                       {selectedModelTime}
                     </span>
                   </div>
                 </div>
 
-                {showTrends ? (
-                  /* Trends inline container */
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {/* Trends inline controls toolbar */}
-                    <div className="trends-toolbar">
-                      {/* Active System selection */}
-                      <div className="trends-toolbar-section" style={{ flex: 1 }}>
-                        <span className="trends-toolbar-label">
-                          Select Active System
-                        </span>
-                        <div className="trends-systems-list">
-                          {(() => {
-                            const key = `${selectedModel === "fnv3_large" ? "large" : "base"}_${trendHorizon}`;
-                            const dists = trendsManifest?.[key] || [];
-                            if (dists.length === 0) {
-                              return (
-                                <div className="trends-empty-text">
-                                  No active systems meeting threshold.
-                                </div>
-                              );
-                            }
-                            return dists.map((d) => (
-                              <button
-                                key={d.id}
-                                onClick={() => setActiveTrendDistId(d.id)}
-                                className={`trends-system-btn ${activeTrendDistId === d.id ? "active" : ""
-                                  }`}
-                              >
-                                {d.name}
-                              </button>
-                            ));
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Horizon selection */}
-                      <div className="trends-toolbar-section" style={{ flexShrink: 0 }}>
-                        <span className="trends-toolbar-label">
-                          Forecast Horizon
-                        </span>
-                        <div className="trends-width-selector">
-                          <button
-                            onClick={() => setTrendHorizon("5day")}
-                            className={`trends-width-btn ${trendHorizon === "5day" ? "active" : ""}`}
-                          >
-                            5-Day
-                          </button>
-                          <button
-                            onClick={() => setTrendHorizon("15day")}
-                            className={`trends-width-btn ${trendHorizon === "15day" ? "active" : ""}`}
-                          >
-                            15-Day
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Width options */}
-                      <div className="trends-toolbar-section" style={{ flexShrink: 0 }}>
-                        <span className="trends-toolbar-label">
-                          Extent Width
-                        </span>
-                        <div className="trends-width-selector">
-                          <button
-                            onClick={() => setIsWideTrend(false)}
-                            className={`trends-width-btn ${!isWideTrend ? "active" : ""}`}
-                          >
-                            Standard
-                          </button>
-                          <button
-                            onClick={() => setIsWideTrend(true)}
-                            className={`trends-width-btn ${isWideTrend ? "active" : ""}`}
-                          >
-                            Wide
-                          </button>
-                        </div>
-                      </div>
+                {/* Standard Forecast Map */}
+                <div className="image-wrapper">
+                  {currentTrack && currentTrack.imageSrc ? (
+                    <img
+                      src={currentTrack.imageSrc}
+                      alt={`Forecast track for ${currentTrack.name}`}
+                      onClick={() => openLightboxWithImage(currentTrack.imageSrc, `${currentTrack.name} (${selectedType.toUpperCase()})`, selectedModel)}
+                      className="forecast-img"
+                    />
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-icon"></div>
+                      <span>No forecast image available. Track unreleased or pending.</span>
                     </div>
-
-                    {/* Trends map image viewport */}
-                    <div className="image-wrapper">
-                      {(() => {
-                        const key = `${selectedModel === "fnv3_large" ? "large" : "base"}_${trendHorizon}`;
-                        const dists = trendsManifest?.[key] || [];
-                        const activeDist = dists.find(d => d.id === activeTrendDistId) || dists[0];
-
-                        if (!trendsManifest) {
-                          return (
-                            <div className="empty-state">
-                              <div className="animate-spin" style={{ width: "24px", height: "24px", borderRadius: "50%", border: "2px solid rgba(0,240,255,0.2)", borderTopColor: "var(--accent-color)" }}></div>
-                              <span>Loading trends manifest...</span>
-                            </div>
-                          );
-                        }
-
-                        if (dists.length === 0 || !activeDist) {
-                          return (
-                            <div className="empty-state">
-                              <div className="empty-icon"></div>
-                              <span style={{ maxWidth: "320px", textAlign: "center", lineHeight: "1.4" }}>
-                                No trend maps pre-rendered for this cycle. Trend maps are only generated for systems with ≥100 tracks (Large) or ≥25 tracks (Base).
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        const imgPath = isWideTrend ? activeDist.wide : activeDist.standard;
-                        const finalImgUrl = getAssetUrl(imgPath);
-
-                        return (
-                          <img
-                            src={finalImgUrl}
-                            alt={`Trends map for ${activeDist.name}`}
-                            className="forecast-img"
-                            onClick={() => setLightboxData({ src: finalImgUrl, title: `${activeDist.name} (${selectedType.toUpperCase()})` })}
-                          />
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ) : (
-                  /* Standard Forecast Map */
-                  <div className="image-wrapper">
-                    {currentTrack && currentTrack.imageSrc ? (
-                      <img
-                        src={currentTrack.imageSrc}
-                        alt={`Forecast track for ${currentTrack.name}`}
-                        onClick={() => openLightboxWithImage(currentTrack.imageSrc, `${currentTrack.name} (${selectedType.toUpperCase()})`, selectedModel)}
-                        className="forecast-img"
-                      />
-                    ) : (
-                      <div className="empty-state">
-                        <div className="empty-icon"></div>
-                        <span>No forecast image available. Track unreleased or pending.</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
             {/* Sidebar / Metadata Controls */}
-            <aside className="panel metadata-panel" style={isCompareGrid ? { width: "100%", gridColumn: "1 / -1" } : {}}>
-              {showTrends ? (
-                /* Trend Details View */
+            <aside className="panel metadata-panel" style={isCompareGrid && selectedType !== "cluster" ? { width: "100%", gridColumn: "1 / -1" } : {}}>
+              {/* Conditional Cluster Meta or Standard Run Details */}
+              {selectedType === "cluster" ? (
                 <div className="metadata-section">
-                  <h2>Trend details</h2>
-                  {(() => {
-                    const key = `${selectedModel === "fnv3_large" ? "large" : "base"}_${trendHorizon}`;
-                    const dists = trendsManifest?.[key] || [];
-                    const activeDist = dists.find(d => d.id === activeTrendDistId) || dists[0];
-                    const totalMembers = selectedModel === "fnv3_large" ? 1000 : 50;
-
-                    if (!activeDist) {
-                      return (
-                        <div className="trends-empty-text">
-                          No active system details.
-                        </div>
-                      );
-                    }
-
-                    const supportRatio = (activeDist.trackCount / totalMembers) * 100;
-
-                    return (
-                      <dl className="details-list">
-                        <div className="detail-item">
-                          <dt>System Name</dt>
-                          <dd className="mono-value">{activeDist.name}</dd>
-                        </div>
-                        <div className="detail-item">
-                          <dt>Supporting Tracks</dt>
-                          <dd className="highlight-text">
-                            {activeDist.trackCount} / {totalMembers} members
-                          </dd>
-                        </div>
-                        <div className="support-ratio-container">
-                          <div className="support-ratio-header">
-                            <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Support Ratio</span>
-                            <span className="highlight-text" style={{ fontWeight: "700" }}>{supportRatio.toFixed(1)}%</span>
-                          </div>
-                          <div className="support-ratio-bar-bg">
-                            <div
-                              className="support-ratio-bar-fill"
-                              style={{ width: `${Math.min(100, supportRatio)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <div className="detail-item">
-                          <dt>Model Engine</dt>
-                          <dd>
-                            {selectedModel === "fnv3_large" ? "WNC Large Ensemble" : selectedModel === "wnv3" ? "GDM WNCv3" : selectedModel === "fnv3p1" ? "GDM WNCP1" : "GDM WNC Base"}
-                          </dd>
-                        </div>
-                        <div className="detail-item">
-                          <dt>Processed by</dt>
-                          <dd className="highlight-text">Calauan Weather</dd>
-                        </div>
-                      </dl>
-                    );
-                  })()}
+                  <div className="cluster-meta-header">
+                    <span className="cluster-live-tag">LIVE CLUSTER ANALYSIS</span>
+                  </div>
+                  <h2>Under-Monitoring Details</h2>
+                  <dl className="details-list">
+                    <div className="detail-item">
+                      <dt>Disturbance Target</dt>
+                      <dd className="highlight-text">{formatClusterLabel(activeClusterItem?.atcf_id || activeClusterItem?.storm_id || selectedClusterId)}</dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Cluster Reference</dt>
+                      <dd className="mono-value">{formatClusterLabel(activeClusterItem?.atcf_id || selectedClusterId)} (Under Monitoring)</dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Model System</dt>
+                      <dd className="mono-value">
+                        {clusterModel === "gdm_wnc_large" ? "GDM WNC Large (1,001 Members)" : "GDM WNCv3 (64 Members)"}
+                      </dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Cycle Run</dt>
+                      <dd className="mono-value">
+                        {activeClusterItem ? `${activeClusterItem.init_date} ${activeClusterItem.cycle}` : "Latest 00Z"}
+                      </dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Disturbance Nursery</dt>
+                      <dd>Western North Pacific / Caroline-Marianas</dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Official ATCF Status</dt>
+                      <dd style={{ color: "#38bdf8", fontWeight: 700 }}>Pre-Classification Monitoring</dd>
+                    </div>
+                  </dl>
+                  <div className="cluster-shortcuts-hint-box" onClick={() => setShowClusterHelp(true)}>
+                    <Command size={13} />
+                    <span>Shortcuts: <kbd>C</kbd> Horizon, <kbd>M</kbd> Model, <kbd>1-4</kbd> Cluster, <kbd>Space</kbd> Zoom</span>
+                  </div>
                 </div>
               ) : (
-                /* Standard Run Details */
                 <div className="metadata-section">
                   <h2>Run details</h2>
                   <dl className="details-list">
@@ -1305,34 +1682,63 @@ const Forecast = () => {
             <div className="lightbox-top-bar" onClick={(e) => e.stopPropagation()}>
               <div className="lightbox-brand-group">
                 <span className="lightbox-brand-title">
-                  {lightboxIndex !== null && availableGridItems[lightboxIndex]
-                    ? availableGridItems[lightboxIndex].model.name.toUpperCase()
-                    : lightboxData.title}
+                  {lightboxData?.isCluster
+                    ? lightboxData.title
+                    : lightboxIndex !== null && availableGridItems[lightboxIndex]
+                      ? availableGridItems[lightboxIndex].model.name.toUpperCase()
+                      : lightboxData.title}
                 </span>
-                <span className="lightbox-brand-badge">MAINLINE</span>
+                <span className="lightbox-brand-badge">{lightboxData?.isCluster ? "CLUSTER" : "MAINLINE"}</span>
               </div>
 
-              {availableGridItems.length > 1 && (
-                <div className="lightbox-model-tabs-center">
-                  {availableGridItems.map((item, idx) => (
-                    <button
-                      key={item.model.id}
-                      className={`lightbox-tab-pill ${idx === lightboxIndex ? "active" : ""}`}
-                      onClick={() => {
-                        setLightboxIndex(idx);
-                        setLightboxData({
-                          src: item.track.imageSrc,
-                          title: `${item.model.name} (${selectedType.toUpperCase()})`
-                        });
-                        setZoomScale(1);
-                        setPanX(0);
-                        setPanY(0);
-                      }}
-                    >
-                      {item.model.name}
-                    </button>
-                  ))}
-                </div>
+              {lightboxData?.isCluster ? (
+                clusterManifest.length > 1 && (
+                  <div className="lightbox-model-tabs-center">
+                    {clusterManifest.map((item, idx) => (
+                      <button
+                        key={item.filename || idx}
+                        className={`lightbox-tab-pill ${idx === lightboxIndex ? "active" : ""}`}
+                        onClick={() => {
+                          setLightboxIndex(idx);
+                          setLightboxData({
+                            src: getAssetUrl(`/assets/${item.filename}`),
+                            title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                            isCluster: true,
+                            item
+                          });
+                          setZoomScale(1);
+                          setPanX(0);
+                          setPanY(0);
+                        }}
+                      >
+                        {formatClusterLabel(item.atcf_id || item.storm_id)} ({item.model === "gdm_wnc_large" ? "Large" : "WNCv3"})
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : (
+                availableGridItems.length > 1 && (
+                  <div className="lightbox-model-tabs-center">
+                    {availableGridItems.map((item, idx) => (
+                      <button
+                        key={item.model.id}
+                        className={`lightbox-tab-pill ${idx === lightboxIndex ? "active" : ""}`}
+                        onClick={() => {
+                          setLightboxIndex(idx);
+                          setLightboxData({
+                            src: item.track.imageSrc,
+                            title: `${item.model.name} (${selectedType.toUpperCase()})`
+                          });
+                          setZoomScale(1);
+                          setPanX(0);
+                          setPanY(0);
+                        }}
+                      >
+                        {item.model.name}
+                      </button>
+                    ))}
+                  </div>
+                )
               )}
 
               <div className="lightbox-top-actions">
@@ -1377,7 +1783,7 @@ const Forecast = () => {
             </div>
 
             {/* Bottom Stepper Pill Bar: < Prev • Dots • Next > */}
-            {availableGridItems.length > 1 && (
+            {(lightboxData?.isCluster ? clusterManifest.length > 1 : availableGridItems.length > 1) && (
               <div className="lightbox-bottom-stepper" onClick={(e) => e.stopPropagation()}>
                 <button className="stepper-btn" onClick={handlePrevLightbox}>
                   <ChevronLeft size={15} />
@@ -1385,17 +1791,28 @@ const Forecast = () => {
                 </button>
 
                 <div className="stepper-dots">
-                  {availableGridItems.map((_, idx) => (
+                  {(lightboxData?.isCluster ? clusterManifest : availableGridItems).map((_, idx) => (
                     <span
                       key={idx}
                       className={`stepper-dot ${idx === lightboxIndex ? "active" : ""}`}
                       onClick={() => {
-                        const item = availableGridItems[idx];
-                        setLightboxIndex(idx);
-                        setLightboxData({
-                          src: item.track.imageSrc,
-                          title: `${item.model.name} (${selectedType.toUpperCase()})`
-                        });
+                        if (lightboxData?.isCluster) {
+                          const item = clusterManifest[idx];
+                          setLightboxIndex(idx);
+                          setLightboxData({
+                            src: getAssetUrl(`/assets/${item.filename}`),
+                            title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                            isCluster: true,
+                            item
+                          });
+                        } else {
+                          const item = availableGridItems[idx];
+                          setLightboxIndex(idx);
+                          setLightboxData({
+                            src: item.track.imageSrc,
+                            title: `${item.model.name} (${selectedType.toUpperCase()})`
+                          });
+                        }
                         setZoomScale(1);
                         setPanX(0);
                         setPanY(0);
@@ -1410,6 +1827,71 @@ const Forecast = () => {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Keyboard Shortcuts & Gestures Modal */}
+        {showClusterHelp && (
+          <div className="cluster-help-backdrop" onClick={() => setShowClusterHelp(false)}>
+            <div className="cluster-help-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="help-dialog-header">
+                <div className="help-title-wrap">
+                  <Command size={18} />
+                  <h4>Cluster Monitoring Shortcuts</h4>
+                </div>
+                <button className="help-close-btn" onClick={() => setShowClusterHelp(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="help-dialog-body">
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Toggle Cluster view</span>
+                  <kbd className="shortcut-key">C</kbd>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Toggle Model (WNCv3 ↔ Large)</span>
+                  <kbd className="shortcut-key">M</kbd>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Side-by-Side Dual View</span>
+                  <kbd className="shortcut-key">D</kbd>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Next / Previous Cluster</span>
+                  <div className="shortcut-keys-group">
+                    <kbd className="shortcut-key">←</kbd>
+                    <kbd className="shortcut-key">→</kbd>
+                  </div>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Direct jump to Cluster 1 – 4</span>
+                  <div className="shortcut-keys-group">
+                    <kbd className="shortcut-key">1</kbd>
+                    <kbd className="shortcut-key">2</kbd>
+                    <kbd className="shortcut-key">3</kbd>
+                    <kbd className="shortcut-key">4</kbd>
+                  </div>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Open Fullscreen Lightbox Zoom</span>
+                  <kbd className="shortcut-key">Space</kbd>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Zoom In / Out in Lightbox</span>
+                  <div className="shortcut-keys-group">
+                    <kbd className="shortcut-key">+</kbd>
+                    <kbd className="shortcut-key">-</kbd>
+                  </div>
+                </div>
+                <div className="shortcut-row">
+                  <span className="shortcut-desc">Close Lightbox / Exit Cluster View</span>
+                  <kbd className="shortcut-key">Esc</kbd>
+                </div>
+              </div>
+              <div className="help-dialog-footer">
+                <span>📱 Touch gestures: Swipe left/right on mobile image to switch clusters</span>
+              </div>
+            </div>
           </div>
         )}
       </section>
