@@ -341,8 +341,8 @@ def plot_cyclone_forecast(data, paired_local_csv, model, date_str, hour_str, hor
 
     model_display = {
         "WNV3": "GDM WNCv3",
-        "FNV3P2": "GDM WNC Base",
-        "FNV3P1": "GDM WNCP1"
+        "FNV3P2": "GDM WNC2",
+        "FNV3P1": "GDM WNC1"
     }.get(model, model)
 
     legend_text = (

@@ -1131,24 +1131,74 @@ def plot_monitoring_tracks(
     mean_gen_lat = np.mean(all_first_lats) if all_first_lats else 15.0
     mean_gen_lon = np.mean(all_first_lons) if all_first_lons else 135.0
 
-    if 112.0 <= mean_gen_lon <= 121.0 and 10.0 <= mean_gen_lat <= 22.0:
+    # Geographic genesis region classification
+    if mean_gen_lon < 114.0 and 4.0 <= mean_gen_lat <= 24.0:
+        region_name = "SOUTH CHINA SEA"
+        region_friendly = "in the South China Sea"
+    elif 118.5 <= mean_gen_lon <= 123.5 and 19.5 <= mean_gen_lat <= 22.5:
+        region_name = "LUZON STRAIT"
+        region_friendly = "in the Luzon Strait"
+    elif 114.0 <= mean_gen_lon <= 121.5 and 10.0 <= mean_gen_lat <= 21.5:
         region_name = "WEST PHILIPPINE SEA"
         region_friendly = "in the West Philippine Sea"
+    elif 117.0 <= mean_gen_lon <= 122.5 and 6.5 <= mean_gen_lat <= 11.5:
+        region_name = "SULU SEA"
+        region_friendly = "in the Sulu Sea"
+    elif 118.0 <= mean_gen_lon <= 126.0 and 2.0 <= mean_gen_lat < 6.5:
+        region_name = "CELEBES SEA"
+        region_friendly = "in the Celebes Sea"
+    elif mean_gen_lon < 121.0 and mean_gen_lat < 10.0:
+        region_name = "SULU / CELEBES SEA"
+        region_friendly = "in the Sulu / Celebes Sea"
+    elif 121.0 <= mean_gen_lon <= 127.5 and 13.5 <= mean_gen_lat <= 19.5:
+        region_name = "EAST OF LUZON"
+        region_friendly = "east of Luzon"
+    elif 122.0 <= mean_gen_lon <= 127.5 and 9.5 <= mean_gen_lat < 13.5:
+        region_name = "EAST OF VISAYAS"
+        region_friendly = "east of the Visayas"
+    elif 123.0 <= mean_gen_lon < 127.5 and 3.5 <= mean_gen_lat < 9.5:
+        region_name = "EAST OF MINDANAO"
+        region_friendly = "east of Mindanao"
+    elif 127.5 <= mean_gen_lon < 133.5 and 3.5 <= mean_gen_lat <= 11.5:
+        region_name = "WEST OF PALAU"
+        region_friendly = "west of Palau"
+    elif 133.5 <= mean_gen_lon <= 136.5 and 3.5 <= mean_gen_lat <= 11.5:
+        region_name = "PALAU VICINITY"
+        region_friendly = "near Palau"
+    elif 136.5 < mean_gen_lon <= 143.0 and 3.0 <= mean_gen_lat <= 11.5:
+        region_name = "EAST OF PALAU"
+        region_friendly = "east of Palau"
+    elif 141.0 <= mean_gen_lon <= 148.0 and 11.5 <= mean_gen_lat <= 21.0:
+        region_name = "MARIANA ISLANDS / GUAM"
+        region_friendly = "near the Mariana Islands / Guam"
+    elif 137.0 <= mean_gen_lon < 141.0 and 11.5 <= mean_gen_lat <= 23.0:
+        region_name = "WEST OF MARIANAS"
+        region_friendly = "west of the Marianas"
+    elif 148.0 < mean_gen_lon <= 158.0 and 11.5 <= mean_gen_lat <= 25.0:
+        region_name = "EAST OF MARIANAS"
+        region_friendly = "east of the Marianas"
+    elif 143.0 < mean_gen_lon <= 152.0 and 3.0 <= mean_gen_lat < 11.5:
+        region_name = "CAROLINE ISLANDS"
+        region_friendly = "in the Caroline Islands"
+    elif mean_gen_lon >= 152.0 and mean_gen_lat <= 20.0:
+        region_name = "EASTERN CAROLINE"
+        region_friendly = "in Eastern Caroline Islands"
+    elif 121.0 <= mean_gen_lon <= 130.0 and 21.5 <= mean_gen_lat <= 26.5:
+        region_name = "TAIWAN / RYUKYU"
+        region_friendly = "near Taiwan / Ryukyu Islands"
+    elif mean_gen_lon <= 130.0 and mean_gen_lat > 26.5:
+        region_name = "EAST CHINA SEA"
+        region_friendly = "in the East China Sea"
+    elif mean_gen_lat > 25.0:
+        if mean_gen_lon <= 132.0:
+            region_name = "EAST CHINA SEA / RYUKYU"
+            region_friendly = "in the East China Sea / Ryukyu"
+        else:
+            region_name = "NORTHWEST PACIFIC"
+            region_friendly = "in the Northwest Pacific"
     elif 121.0 <= mean_gen_lon <= 138.0 and 5.0 <= mean_gen_lat <= 25.0:
         region_name = "PHILIPPINE SEA"
         region_friendly = "in the Philippine Sea"
-    elif mean_gen_lon < 120.0 and mean_gen_lat < 12.0:
-        region_name = "SULU / CELEBES SEA"
-        region_friendly = "in the Sulu / Celebes Sea"
-    elif mean_gen_lon >= 152.0 and mean_gen_lat <= 20.0:
-        region_name = "EASTERN CAROLINE / WESTPAC"
-        region_friendly = "in Eastern Caroline Islands / WestPac"
-    elif 138.0 <= mean_gen_lon < 152.0 and mean_gen_lat <= 25.0:
-        region_name = "EAST OF MARIANAS / WESTPAC"
-        region_friendly = "east of the Marianas"
-    elif mean_gen_lat > 25.0:
-        region_name = "EAST CHINA SEA / RYUKYU"
-        region_friendly = "in the East China Sea / Ryukyu"
     else:
         region_name = "WESTERN PACIFIC"
         region_friendly = "in the Western Pacific"

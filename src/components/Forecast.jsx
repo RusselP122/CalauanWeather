@@ -18,7 +18,7 @@ import "./Forecast.css";
 
 // Operational under-monitoring models configuration
 const CLUSTER_MODELS = [
-  { id: "gdm_wnc_large", name: "GDM WNC Large", shortName: "WNC Large", members: "1,001 Members", badge: "1001-ENS" },
+  { id: "gdm_wnc_large", name: "GDM WNC Large", shortName: "WNC Large", members: "1,000 Members", badge: "1000-ENS" },
   { id: "gdm_wncv3", name: "GDM WNCv3", shortName: "WNCv3", members: "64 Members", badge: "64-ENS" }
 ];
 
@@ -285,8 +285,8 @@ const FORECAST_OPTIONS = FORECAST_DATES.flatMap((dateStr) =>
 
 const modelsList = [
   { id: "wnv3", name: "GDM WNCv3", key: "wnv3", source: "GDM WNCv3 Ensemble" },
-  { id: "fnv3_base", name: "GDM WNC Base", key: "fnv3-base", source: "GDM Ensemble" },
-  { id: "fnv3p1", name: "GDM WNCP1", key: "fnv3p1", source: "GDM FNV3P1 Ensemble" },
+  { id: "fnv3_base", name: "GDM WNC2", key: "fnv3-base", source: "GDM Ensemble" },
+  { id: "fnv3p1", name: "GDM WNC1", key: "fnv3p1", source: "GDM FNV3P1 Ensemble" },
   { id: "fnv3_large", name: "WNC Large", key: "fnv3-large", source: "GDM Large Ensemble" },
   { id: "ifs", name: "ECMWF IFS", key: "ifs", source: "ECMWF IFS Ensemble" },
   { id: "aifs", name: "ECMWF AIFS", key: "aifs", source: "ECMWF AIFS Ensemble" },
@@ -296,7 +296,7 @@ const modelsList = [
 const specsData = [
   {
     id: "fnv3_base",
-    name: "GDM WNC Base",
+    name: "GDM WNC2",
     res: "0.25° (~28km)",
     members: "50 members",
     type: "DL-initialized",
@@ -305,7 +305,7 @@ const specsData = [
   },
   {
     id: "fnv3p1",
-    name: "GDM WNCP1",
+    name: "GDM WNC1",
     res: "0.25° (~28km)",
     members: "50 members",
     type: "DL-initialized",
@@ -548,46 +548,133 @@ const Forecast = () => {
       .filter((item) => item.track && item.track.imageSrc);
   }, [modelsList, selectedType, selectedModelTime, selectedStormId, availableIds, showForecastTrack, showClusters]);
 
-  // Available initialization runs in cluster manifest (e.g. '20261008_06Z', '20261008_00Z')
-  // Automatically distinguishes repeating 00Z-18Z cycles across different forecast days!
+  // Available initialization runs in cluster manifest strictly for the latest init date & standard cycles (00Z, 06Z, 12Z, 18Z)
   const availableClusterRuns = useMemo(() => {
-    const map = new Map();
-    const allDates = new Set();
-    clusterManifest.forEach((item) => {
-      const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-      allDates.add(d);
-    });
-    const hasMultipleDates = allDates.size > 1;
+    if (!clusterManifest || clusterManifest.length === 0) return [];
 
-    clusterManifest.forEach((item) => {
-      const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-      const c = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
-      const key = `${d}_${c}`;
-      if (!map.has(key)) {
-        let dateLabel = d;
-        if (d && d.length === 8) {
-          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          const mIdx = parseInt(d.slice(4, 6), 10) - 1;
-          const day = parseInt(d.slice(6, 8), 10);
-          if (mIdx >= 0 && mIdx < 12) {
-            dateLabel = `${months[mIdx]} ${day}`;
-          }
+    const STANDARD_CYCLES = ["00Z", "06Z", "12Z", "18Z"];
+
+    const getItemDate = (item) => {
+      return item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "");
+    };
+
+    const getItemCycle = (item) => {
+      return item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+    };
+
+    const formatDateLabel = (d) => {
+      if (d && d.length === 8) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const mIdx = parseInt(d.slice(4, 6), 10) - 1;
+        const day = parseInt(d.slice(6, 8), 10);
+        if (mIdx >= 0 && mIdx < 12) {
+          return `${months[mIdx]} ${day}`;
         }
-        map.set(key, {
-          key,
-          init_date: d,
-          cycle: c,
-          dateLabel,
-          displayLabel: hasMultipleDates ? `${dateLabel} · ${c}` : c
-        });
       }
-    });
+      return d;
+    };
 
-    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
-  }, [clusterManifest]);
+    let latestDate = "";
+    let candidateItems = [];
 
-  // Resolves the currently active cluster run key (fallback to latest available run)
-  const activeClusterRunKey = selectedClusterRun || availableClusterRuns[0]?.key || "";
+    if (isClusterSplitView) {
+      // In Side-by-Side mode: use cycles that BOTH models have for that date
+      const v3Pairs = new Set();
+      const largePairs = new Set();
+
+      clusterManifest.forEach((item) => {
+        const c = getItemCycle(item);
+        const d = getItemDate(item);
+        if (!STANDARD_CYCLES.includes(c) || !d) return;
+
+        if (item.model === "gdm_wncv3") {
+          v3Pairs.add(`${d}_${c}`);
+        } else if (item.model === "gdm_wnc_large") {
+          largePairs.add(`${d}_${c}`);
+        }
+      });
+
+      // Find common (date, cycle) pairs
+      const commonPairs = Array.from(v3Pairs).filter((pair) => largePairs.has(pair));
+
+      // Find all dates from common pairs
+      const commonDates = Array.from(new Set(commonPairs.map((pair) => pair.split("_")[0])));
+
+      if (commonDates.length > 0) {
+        commonDates.sort((a, b) => b.localeCompare(a));
+        latestDate = commonDates[0]; // Newest common date
+        const allowedCycles = new Set(
+          commonPairs
+            .filter((p) => p.startsWith(`${latestDate}_`))
+            .map((p) => p.split("_")[1])
+        );
+        candidateItems = clusterManifest.filter((m) => {
+          const d = getItemDate(m);
+          const c = getItemCycle(m);
+          return d === latestDate && allowedCycles.has(c);
+        });
+      } else {
+        // Fallback: if no date is shared by both, use latest date across manifest
+        const allDates = Array.from(new Set(clusterManifest.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+        latestDate = allDates[0] || "";
+        candidateItems = clusterManifest.filter((m) => getItemDate(m) === latestDate);
+      }
+    } else {
+      // Single Model mode: each model shows its OWN latest date
+      const modelItems = clusterManifest.filter((item) => {
+        const c = getItemCycle(item);
+        return item.model === clusterModel && STANDARD_CYCLES.includes(c);
+      });
+
+      const modelDates = Array.from(new Set(modelItems.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+      latestDate = modelDates[0] || "";
+
+      candidateItems = modelItems.filter((m) => getItemDate(m) === latestDate);
+    }
+
+    if (!latestDate) return [];
+
+    const dateLabel = formatDateLabel(latestDate);
+
+    // Collect standard cycles available for the latest date
+    const availableCyclesSet = new Set(
+      candidateItems
+        .map(getItemCycle)
+        .filter((c) => STANDARD_CYCLES.includes(c))
+    );
+
+    // Sort strictly in ASCENDING order: 00Z, 06Z, 12Z, 18Z
+    const sortedCycles = STANDARD_CYCLES.filter((c) => availableCyclesSet.has(c));
+
+    const isSingleCycle = sortedCycles.length === 1;
+
+    return sortedCycles.map((c) => ({
+      key: `${latestDate}_${c}`,
+      init_date: latestDate,
+      cycle: c,
+      dateLabel,
+      displayLabel: isSingleCycle ? `${dateLabel} · ${c}` : c,
+    }));
+  }, [clusterManifest, isClusterSplitView, clusterModel]);
+
+  // Resolves the currently active cluster run key (fallback to newest available run in the row)
+  const newestClusterRun = availableClusterRuns[availableClusterRuns.length - 1];
+  const activeClusterRunKey = availableClusterRuns.some((r) => r.key === selectedClusterRun)
+    ? selectedClusterRun
+    : newestClusterRun?.key || "";
+
+  // Auto-snap selected cluster run to newest cycle if current selection is no longer valid
+  useEffect(() => {
+    if (availableClusterRuns.length > 0) {
+      const exists = availableClusterRuns.some((r) => r.key === selectedClusterRun);
+      if (!exists) {
+        const newest = availableClusterRuns[availableClusterRuns.length - 1];
+        if (newest) {
+          setSelectedClusterRun(newest.key);
+        }
+      }
+    }
+  }, [availableClusterRuns, selectedClusterRun]);
 
   // Derived cluster lists formatted as 'Cluster 01', 'Cluster 02', etc.
   // Filtered by activeClusterRunKey AND (in single-model view) by active clusterModel!
@@ -1668,7 +1755,7 @@ const Forecast = () => {
 
                   <div className="cluster-actions-group">
                     {/* Cycle Segmented Control */}
-                    {availableClusterRuns.length > 1 && (
+                    {availableClusterRuns.length > 0 && (
                       <div className="cluster-cycle-segmented">
                         <span className="cycle-seg-label">Cycle:</span>
                         {availableClusterRuns.map((run) => (
@@ -1964,7 +2051,7 @@ const Forecast = () => {
                     <div className="detail-item">
                       <dt>Model System</dt>
                       <dd className="mono-value">
-                        {clusterModel === "gdm_wnc_large" ? "GDM WNC Large (1,001 Members)" : "GDM WNCv3 (64 Members)"}
+                        {clusterModel === "gdm_wnc_large" ? "GDM WNC (1,000 Members)" : "GDM WNCv3 (64 Members)"}
                       </dd>
                     </div>
                     <div className="detail-item">
@@ -1974,11 +2061,11 @@ const Forecast = () => {
                       </dd>
                     </div>
                     <div className="detail-item">
-                      <dt>Disturbance Nursery</dt>
+                      <dt>Disturbance Area</dt>
                       <dd>Western North Pacific / Caroline-Marianas</dd>
                     </div>
                     <div className="detail-item">
-                      <dt>Official ATCF Status</dt>
+                      <dt>Status</dt>
                       <dd style={{ color: "#38bdf8", fontWeight: 700 }}>Pre-Classification Monitoring</dd>
                     </div>
                   </dl>
