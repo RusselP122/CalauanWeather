@@ -439,18 +439,27 @@ const Forecast = () => {
       .catch(() => { });
   }, []);
 
-  // Zoom & Pan Lightbox States
+  // Zoom & Pan Lightbox States (kept in refs to prevent render-cycle resets)
   const [lightboxData, setLightboxData] = useState(null); // { src, title }
   const [lightboxIndex, setLightboxIndex] = useState(null);
-  const [zoomScale, setZoomScale] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
+  const [displayScale, setDisplayScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [touchStartDist, setTouchStartDist] = useState(0);
-  const touchSwipeStartRef = useRef(null);
 
+  const scaleRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
   const canvasRef = useRef(null);
+  const imgRef = useRef(null);
+  const currentSrcRef = useRef(null);
+  const lightboxIndexRef = useRef(lightboxIndex);
+  const lightboxDataRef = useRef(lightboxData);
+
+  useEffect(() => {
+    lightboxIndexRef.current = lightboxIndex;
+  }, [lightboxIndex]);
+
+  useEffect(() => {
+    lightboxDataRef.current = lightboxData;
+  }, [lightboxData]);
 
   // Reset view modes when selected model changes
   useEffect(() => {
@@ -501,31 +510,6 @@ const Forecast = () => {
       }
     }
   }, [availableIds, selectedModel, isCompareGrid, hasManuallySelected]);
-
-  // Lightbox gesture/wheel controller
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const preventDefaultWheel = (e) => {
-      e.preventDefault();
-      const zoomFactor = 0.25;
-      setZoomScale((prev) => {
-        let newScale = prev + (e.deltaY < 0 ? zoomFactor : -zoomFactor);
-        newScale = Math.min(Math.max(newScale, 1), 4);
-        if (newScale === 1) {
-          setPanX(0);
-          setPanY(0);
-        }
-        return newScale;
-      });
-    };
-
-    canvas.addEventListener("wheel", preventDefaultWheel, { passive: false });
-    return () => {
-      canvas.removeEventListener("wheel", preventDefaultWheel);
-    };
-  }, [lightboxData]);
 
   // Single model track data helper
   const getModelTrackData = (modelId) => {
@@ -650,10 +634,10 @@ const Forecast = () => {
     if (!clusterManifest.length) return null;
     const runItems = activeClusterRunKey
       ? clusterManifest.filter((m) => {
-          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
-          return `${d}_${c}` === activeClusterRunKey;
-        })
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        return `${d}_${c}` === activeClusterRunKey;
+      })
       : clusterManifest;
 
     let match = runItems.find(
@@ -671,10 +655,10 @@ const Forecast = () => {
   const splitV3Item = useMemo(() => {
     const runItems = activeClusterRunKey
       ? clusterManifest.filter((m) => {
-          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
-          return `${d}_${c}` === activeClusterRunKey;
-        })
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        return `${d}_${c}` === activeClusterRunKey;
+      })
       : clusterManifest;
 
     return (
@@ -687,10 +671,10 @@ const Forecast = () => {
   const splitLargeItem = useMemo(() => {
     const runItems = activeClusterRunKey
       ? clusterManifest.filter((m) => {
-          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
-          return `${d}_${c}` === activeClusterRunKey;
-        })
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        return `${d}_${c}` === activeClusterRunKey;
+      })
       : clusterManifest;
 
     return (
@@ -714,83 +698,144 @@ const Forecast = () => {
     setSelectedClusterId(availableClusterList[prevIdx].id);
   }, [availableClusterList, selectedClusterId]);
 
+  // Filter cluster list in Lightbox strictly by the currently displayed model (Large vs WNCv3) and cycle!
+  const activeLightboxClusterList = useMemo(() => {
+    if (!lightboxData?.isCluster) return [];
+    const modelToUse = lightboxData.item?.model || clusterModel;
+    const itemDate = lightboxData.item?.init_date || (lightboxData.item?.unique_key?.match(/(\d{8})T/)?.[1] || "");
+    const itemCycle = lightboxData.item?.cycle || (lightboxData.item?.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+    const runToUse = itemDate && itemCycle ? `${itemDate}_${itemCycle}` : activeClusterRunKey;
+
+    const filtered = clusterManifest.filter((m) => {
+      if (m.model !== modelToUse) return false;
+      if (runToUse) {
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        const rKey = d && c ? `${d}_${c}` : "";
+        if (rKey && rKey !== runToUse) return false;
+      }
+      return true;
+    });
+
+    const seen = new Set();
+    const unique = [];
+    filtered.forEach((m) => {
+      const key = m.atcf_id || m.storm_id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(m);
+      }
+    });
+
+    return unique.sort((a, b) => {
+      const labelA = formatClusterLabel(a.atcf_id || a.storm_id);
+      const labelB = formatClusterLabel(b.atcf_id || b.storm_id);
+      return labelA.localeCompare(labelB);
+    });
+  }, [clusterManifest, lightboxData?.isCluster, lightboxData?.item, clusterModel, activeClusterRunKey]);
+
   const openClusterLightbox = (item) => {
     if (!item) return;
+    const modelToUse = item.model || clusterModel;
+    const itemDate = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "");
+    const itemCycle = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+    const runToUse = itemDate && itemCycle ? `${itemDate}_${itemCycle}` : activeClusterRunKey;
+
+    const list = clusterManifest.filter((m) => {
+      if (m.model !== modelToUse) return false;
+      if (runToUse) {
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        const rKey = d && c ? `${d}_${c}` : "";
+        if (rKey && rKey !== runToUse) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      const labelA = formatClusterLabel(a.atcf_id || a.storm_id);
+      const labelB = formatClusterLabel(b.atcf_id || b.storm_id);
+      return labelA.localeCompare(labelB);
+    });
+
+    const clusterId = item.atcf_id || item.storm_id;
+    const foundIdx = list.findIndex((m) => (m.atcf_id || m.storm_id) === clusterId);
+
     const src = getAssetUrl(`/assets/${item.filename}`);
-    const title = `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`;
+    const title = `${formatClusterLabel(clusterId)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`;
+    scaleRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    setDisplayScale(1);
+    setLightboxIndex(foundIdx !== -1 ? foundIdx : 0);
     setLightboxData({
       src,
       title,
       isCluster: true,
       item
     });
-    setLightboxIndex(clusterManifest.findIndex((m) => m.filename === item.filename));
-    setZoomScale(1);
-    setPanX(0);
-    setPanY(0);
   };
 
-  const handlePrevLightbox = (e) => {
-    if (e) e.stopPropagation();
-    if (lightboxData?.isCluster && clusterManifest.length > 0 && lightboxIndex !== null) {
-      const prevIdx = (lightboxIndex - 1 + clusterManifest.length) % clusterManifest.length;
-      const prevItem = clusterManifest[prevIdx];
-      setLightboxIndex(prevIdx);
-      setLightboxData({
-        src: getAssetUrl(`/assets/${prevItem.filename}`),
-        title: `${formatClusterLabel(prevItem.atcf_id || prevItem.storm_id)} • ${prevItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${prevItem.cycle || "00Z"})`,
-        isCluster: true,
-        item: prevItem
+  const handlePrevLightbox = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const currentData = lightboxDataRef.current;
+    if (currentData?.isCluster && activeLightboxClusterList.length > 0) {
+      setLightboxIndex((prevIdx) => {
+        const cur = prevIdx ?? 0;
+        const prevIdxVal = (cur - 1 + activeLightboxClusterList.length) % activeLightboxClusterList.length;
+        const prevItem = activeLightboxClusterList[prevIdxVal];
+        setLightboxData({
+          src: getAssetUrl(`/assets/${prevItem.filename}`),
+          title: `${formatClusterLabel(prevItem.atcf_id || prevItem.storm_id)} • ${prevItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${prevItem.cycle || "00Z"})`,
+          isCluster: true,
+          item: prevItem
+        });
+        return prevIdxVal;
       });
-      setZoomScale(1);
-      setPanX(0);
-      setPanY(0);
       return;
     }
-    if (availableGridItems.length > 0 && lightboxIndex !== null) {
-      const prevIdx = (lightboxIndex - 1 + availableGridItems.length) % availableGridItems.length;
-      const prevItem = availableGridItems[prevIdx];
-      setLightboxIndex(prevIdx);
-      setLightboxData({
-        src: prevItem.track.imageSrc,
-        title: `${prevItem.model.name} (${selectedType.toUpperCase()})`
+    if (availableGridItems.length > 0) {
+      setLightboxIndex((prevIdx) => {
+        const cur = prevIdx ?? 0;
+        const prevIdxVal = (cur - 1 + availableGridItems.length) % availableGridItems.length;
+        const prevItem = availableGridItems[prevIdxVal];
+        setLightboxData({
+          src: prevItem.track.imageSrc,
+          title: `${prevItem.model.name} (${selectedType.toUpperCase()})`
+        });
+        return prevIdxVal;
       });
-      setZoomScale(1);
-      setPanX(0);
-      setPanY(0);
     }
-  };
+  }, [activeLightboxClusterList, availableGridItems, selectedType]);
 
-  const handleNextLightbox = (e) => {
-    if (e) e.stopPropagation();
-    if (lightboxData?.isCluster && clusterManifest.length > 0 && lightboxIndex !== null) {
-      const nextIdx = (lightboxIndex + 1) % clusterManifest.length;
-      const nextItem = clusterManifest[nextIdx];
-      setLightboxIndex(nextIdx);
-      setLightboxData({
-        src: getAssetUrl(`/assets/${nextItem.filename}`),
-        title: `${formatClusterLabel(nextItem.atcf_id || nextItem.storm_id)} • ${nextItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${nextItem.cycle || "00Z"})`,
-        isCluster: true,
-        item: nextItem
+  const handleNextLightbox = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const currentData = lightboxDataRef.current;
+    if (currentData?.isCluster && activeLightboxClusterList.length > 0) {
+      setLightboxIndex((prevIdx) => {
+        const cur = prevIdx ?? 0;
+        const nextIdxVal = (cur + 1) % activeLightboxClusterList.length;
+        const nextItem = activeLightboxClusterList[nextIdxVal];
+        setLightboxData({
+          src: getAssetUrl(`/assets/${nextItem.filename}`),
+          title: `${formatClusterLabel(nextItem.atcf_id || nextItem.storm_id)} • ${nextItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${nextItem.cycle || "00Z"})`,
+          isCluster: true,
+          item: nextItem
+        });
+        return nextIdxVal;
       });
-      setZoomScale(1);
-      setPanX(0);
-      setPanY(0);
       return;
     }
-    if (availableGridItems.length > 0 && lightboxIndex !== null) {
-      const nextIdx = (lightboxIndex + 1) % availableGridItems.length;
-      const nextItem = availableGridItems[nextIdx];
-      setLightboxIndex(nextIdx);
-      setLightboxData({
-        src: nextItem.track.imageSrc,
-        title: `${nextItem.model.name} (${selectedType.toUpperCase()})`
+    if (availableGridItems.length > 0) {
+      setLightboxIndex((prevIdx) => {
+        const cur = prevIdx ?? 0;
+        const nextIdxVal = (cur + 1) % availableGridItems.length;
+        const nextItem = availableGridItems[nextIdxVal];
+        setLightboxData({
+          src: nextItem.track.imageSrc,
+          title: `${nextItem.model.name} (${selectedType.toUpperCase()})`
+        });
+        return nextIdxVal;
       });
-      setZoomScale(1);
-      setPanX(0);
-      setPanY(0);
     }
-  };
+  }, [activeLightboxClusterList, availableGridItems, selectedType]);
 
   const openLightboxWithImage = (src, title, modelId) => {
     let idx = -1;
@@ -800,20 +845,21 @@ const Forecast = () => {
     if (idx === -1) {
       idx = availableGridItems.findIndex((item) => item.track && item.track.imageSrc === src);
     }
+    scaleRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    setDisplayScale(1);
     setLightboxIndex(idx !== -1 ? idx : 0);
     setLightboxData({ src, title });
-    setZoomScale(1);
-    setPanX(0);
-    setPanY(0);
   };
 
   // Close Lightbox Canvas
   const closeLightbox = useCallback(() => {
     setLightboxData(null);
     setLightboxIndex(null);
-    setZoomScale(1);
-    setPanX(0);
-    setPanY(0);
+    currentSrcRef.current = null;
+    scaleRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    setDisplayScale(1);
   }, []);
 
   // Mobile Touch Swipe Handlers for Cluster Card
@@ -836,26 +882,117 @@ const Forecast = () => {
     }
   };
 
-  // Touch Swipe navigation handlers for Lightbox modal
-  const handleLightboxTouchStart = (e) => {
-    if (e.touches && e.touches.length === 1) {
-      touchSwipeStartRef.current = e.touches[0].clientX;
-    }
-  };
+  // Direct DOM transform application for 60fps gesture rendering
+  const applyTransform = useCallback((smooth = false) => {
+    if (!imgRef.current) return;
+    imgRef.current.style.transition = smooth ? "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)" : "none";
+    imgRef.current.style.transformOrigin = "0 0";
+    imgRef.current.style.transform = `translate(${panRef.current.x}px, ${panRef.current.y}px) scale(${scaleRef.current})`;
+  }, []);
 
-  const handleLightboxTouchEnd = (e) => {
-    if (touchSwipeStartRef.current !== null && e.changedTouches && e.changedTouches.length === 1) {
-      const touchEndClientX = e.changedTouches[0].clientX;
-      const swipeDelta = touchEndClientX - touchSwipeStartRef.current;
-      touchSwipeStartRef.current = null;
+  // Clamping algorithm ensuring the zoomed image stays bounded without empty edge gaps
+  const clampPan = useCallback((scale, x, y) => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return { x, y };
 
-      if (swipeDelta < -45) {
-        handleNextLightbox();
-      } else if (swipeDelta > 45) {
-        handlePrevLightbox();
-      }
+    const cWidth = canvas.clientWidth;
+    const cHeight = canvas.clientHeight;
+    const iWidth = img.offsetWidth;
+    const iHeight = img.offsetHeight;
+
+    if (!iWidth || !iHeight || !cWidth || !cHeight) return { x, y };
+
+    const left0 = (cWidth - iWidth) / 2;
+    const top0 = (cHeight - iHeight) / 2;
+
+    const scaledW = iWidth * scale;
+    const scaledH = iHeight * scale;
+
+    let clampedX = x;
+    let clampedY = y;
+
+    if (scaledW >= cWidth) {
+      const minX = cWidth - left0 - scaledW;
+      const maxX = -left0;
+      clampedX = Math.min(Math.max(x, minX), maxX);
+    } else {
+      clampedX = (cWidth - scaledW) / 2 - left0;
     }
-  };
+
+    if (scaledH >= cHeight) {
+      const minY = cHeight - top0 - scaledH;
+      const maxY = -top0;
+      clampedY = Math.min(Math.max(y, minY), maxY);
+    } else {
+      clampedY = (cHeight - scaledH) / 2 - top0;
+    }
+
+    return { x: clampedX, y: clampedY };
+  }, []);
+
+  const zoomAtPoint = useCallback((targetScale, ptX, ptY) => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+
+    const clampedScale = Math.min(Math.max(targetScale, 1), 5);
+    if (clampedScale <= 1.02) {
+      scaleRef.current = 1;
+      panRef.current = { x: 0, y: 0 };
+      applyTransform(true);
+      setDisplayScale(1);
+      return;
+    }
+
+    const cWidth = canvas.clientWidth;
+    const cHeight = canvas.clientHeight;
+    const iWidth = img.offsetWidth;
+    const iHeight = img.offsetHeight;
+    const left0 = (cWidth - iWidth) / 2;
+    const top0 = (cHeight - iHeight) / 2;
+
+    const uX = (ptX - left0 - panRef.current.x) / scaleRef.current;
+    const uY = (ptY - top0 - panRef.current.y) / scaleRef.current;
+
+    const newX = ptX - left0 - clampedScale * uX;
+    const newY = ptY - top0 - clampedScale * uY;
+
+    const clamped = clampPan(clampedScale, newX, newY);
+    scaleRef.current = clampedScale;
+    panRef.current = clamped;
+    applyTransform(true);
+    setDisplayScale(clampedScale);
+  }, [applyTransform, clampPan]);
+
+  const handleZoomIn = useCallback(() => {
+    const canvas = canvasRef.current;
+    const midX = canvas ? canvas.clientWidth / 2 : 0;
+    const midY = canvas ? canvas.clientHeight / 2 : 0;
+    zoomAtPoint(scaleRef.current + 0.5, midX, midY);
+  }, [zoomAtPoint]);
+
+  const handleZoomOut = useCallback(() => {
+    const canvas = canvasRef.current;
+    const midX = canvas ? canvas.clientWidth / 2 : 0;
+    const midY = canvas ? canvas.clientHeight / 2 : 0;
+    const targetScale = Math.max(scaleRef.current - 0.5, 1);
+    if (targetScale <= 1.02) {
+      scaleRef.current = 1;
+      panRef.current = { x: 0, y: 0 };
+      applyTransform(true);
+      setDisplayScale(1);
+    } else {
+      zoomAtPoint(targetScale, midX, midY);
+    }
+  }, [zoomAtPoint, applyTransform]);
+
+  const handleResetZoom = useCallback(() => {
+    scaleRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    applyTransform(true);
+    setDisplayScale(1);
+  }, [applyTransform]);
 
   // Comprehensive Global Keyboard Shortcuts Listener
   useEffect(() => {
@@ -876,15 +1013,13 @@ const Forecast = () => {
           closeLightbox();
         } else if (e.key === "+" || e.key === "=") {
           e.preventDefault();
-          setZoomScale((prev) => Math.min(prev + 0.5, 4));
+          handleZoomIn();
         } else if (e.key === "-" || e.key === "_") {
           e.preventDefault();
-          setZoomScale((prev) => Math.max(prev - 0.5, 1));
+          handleZoomOut();
         } else if (e.key === "0" || e.key.toLowerCase() === "r") {
           e.preventDefault();
-          setZoomScale(1);
-          setPanX(0);
-          setPanY(0);
+          handleResetZoom();
         }
         return;
       }
@@ -979,102 +1114,293 @@ const Forecast = () => {
     setExpandedSpecs((prev) => (prev === id ? null : id));
   };
 
-  // Drag coordinates calculations
-  const handleDragStart = (e) => {
-    if (zoomScale === 1) return;
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-    if (clientX === undefined || clientY === undefined) return;
-    setIsDragging(true);
-    setDragStart({ x: clientX - panX, y: clientY - panY });
-  };
+  const handleNextRef = useRef(handleNextLightbox);
+  const handlePrevRef = useRef(handlePrevLightbox);
+  useEffect(() => {
+    handleNextRef.current = handleNextLightbox;
+    handlePrevRef.current = handlePrevLightbox;
+  }, [handleNextLightbox, handlePrevLightbox]);
 
-  const handleDragMove = (e) => {
-    if (!isDragging || zoomScale === 1) return;
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-    if (clientX === undefined || clientY === undefined) return;
-    setPanX(clientX - dragStart.x);
-    setPanY(clientY - dragStart.y);
-  };
-
-  const handleDragEnd = () => {
-    setIsDragging(false);
-  };
-
-  // Touch support for dragging + pinch zoom + swipe navigation
-  const handleTouchStart = (e) => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      setTouchStartDist(Math.hypot(dx, dy));
-    } else if (e.touches.length === 1) {
-      touchSwipeStartRef.current = e.touches[0].clientX;
-      handleDragStart(e);
-    }
-  };
-
-  const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && touchStartDist > 0) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.hypot(dx, dy);
-      const factor = dist / touchStartDist;
-
-      setZoomScale((prev) => {
-        let newScale = prev * factor;
-        newScale = Math.min(Math.max(newScale, 1), 4);
-        if (newScale === 1) {
-          setPanX(0);
-          setPanY(0);
-        }
-        return newScale;
+  // Reset zoom and pan ONLY when the displayed image actually changes
+  useEffect(() => {
+    if (lightboxData?.src && lightboxData.src !== currentSrcRef.current) {
+      currentSrcRef.current = lightboxData.src;
+      scaleRef.current = 1;
+      panRef.current = { x: 0, y: 0 };
+      setDisplayScale(1);
+      requestAnimationFrame(() => {
+        applyTransform(false);
       });
-      setTouchStartDist(dist);
-    } else if (e.touches.length === 1) {
-      handleDragMove(e);
     }
-  };
+  }, [lightboxData?.src, applyTransform]);
 
-  const handleTouchEnd = (e) => {
-    if (e.touches.length < 2) {
-      setTouchStartDist(0);
-    }
-    handleDragEnd();
+  // Unified Pointer Events, Gesture Clamping, Pinch Zoom, Double-Tap & Desktop Wheel Controller
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !lightboxData) return;
 
-    if (zoomScale === 1 && touchSwipeStartRef.current !== null && e.changedTouches && e.changedTouches.length === 1) {
-      const touchEndClientX = e.changedTouches[0].clientX;
-      const swipeDelta = touchEndClientX - touchSwipeStartRef.current;
-      touchSwipeStartRef.current = null;
+    const ac = new AbortController();
+    const { signal } = ac;
 
-      if (swipeDelta < -40) {
-        handleNextLightbox();
-      } else if (swipeDelta > 40) {
-        handlePrevLightbox();
+    const activePointers = new Map();
+    const gestureState = {
+      hadMultiTouch: false,
+      startX: 0,
+      startY: 0,
+      startTime: 0,
+      lastPoint: null,
+      initialPinchDist: 0,
+      initialPinchScale: 1,
+      initialPinchMidpoint: null,
+      initialPinchPan: { x: 0, y: 0 },
+      lastTapTime: 0,
+      lastTapPos: { x: 0, y: 0 }
+    };
+
+    const onPointerDown = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch (_) { }
+
+      const rect = canvas.getBoundingClientRect();
+      const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      activePointers.set(e.pointerId, pt);
+
+      const count = activePointers.size;
+
+      if (count === 1) {
+        setIsDragging(true);
+        gestureState.hadMultiTouch = false;
+        gestureState.startX = pt.x;
+        gestureState.startY = pt.y;
+        gestureState.startTime = Date.now();
+        gestureState.lastPoint = { ...pt };
+      } else if (count === 2) {
+        setIsDragging(true);
+        gestureState.hadMultiTouch = true;
+        const pts = Array.from(activePointers.values());
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        gestureState.initialPinchDist = Math.hypot(dx, dy) || 1;
+        gestureState.initialPinchScale = scaleRef.current;
+        gestureState.initialPinchMidpoint = {
+          x: (pts[0].x + pts[1].x) / 2,
+          y: (pts[0].y + pts[1].y) / 2
+        };
+        gestureState.initialPinchPan = { ...panRef.current };
+      } else {
+        gestureState.hadMultiTouch = true;
       }
-    }
-  };
+    };
 
-  const handleZoomIn = () => {
-    setZoomScale((prev) => Math.min(prev + 0.5, 4));
-  };
+    const onPointerMove = (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      const rect = canvas.getBoundingClientRect();
+      const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      activePointers.set(e.pointerId, pt);
 
-  const handleZoomOut = () => {
-    setZoomScale((prev) => {
-      const next = Math.max(prev - 0.5, 1);
-      if (next === 1) {
-        setPanX(0);
-        setPanY(0);
+      const count = activePointers.size;
+      const img = imgRef.current;
+      if (!img) return;
+
+      if (count === 2) {
+        // Pinch zoom: zooms around the midpoint between fingers and pans with it
+        const pts = Array.from(activePointers.values());
+        const currentDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+        const currentMidpoint = {
+          x: (pts[0].x + pts[1].x) / 2,
+          y: (pts[0].y + pts[1].y) / 2
+        };
+
+        const ratio = currentDist / gestureState.initialPinchDist;
+        let newScale = gestureState.initialPinchScale * ratio;
+        newScale = Math.min(Math.max(newScale, 1), 5);
+
+        const cWidth = canvas.clientWidth;
+        const cHeight = canvas.clientHeight;
+        const iWidth = img.offsetWidth;
+        const iHeight = img.offsetHeight;
+        const left0 = (cWidth - iWidth) / 2;
+        const top0 = (cHeight - iHeight) / 2;
+
+        const uX = (gestureState.initialPinchMidpoint.x - left0 - gestureState.initialPinchPan.x) / gestureState.initialPinchScale;
+        const uY = (gestureState.initialPinchMidpoint.y - top0 - gestureState.initialPinchPan.y) / gestureState.initialPinchScale;
+
+        const rawX = currentMidpoint.x - left0 - newScale * uX;
+        const rawY = currentMidpoint.y - top0 - newScale * uY;
+
+        const clamped = clampPan(newScale, rawX, rawY);
+        scaleRef.current = newScale;
+        panRef.current = clamped;
+        applyTransform(false);
+      } else if (count === 1 && gestureState.lastPoint) {
+        if (scaleRef.current > 1) {
+          // When scale > 1, one-finger drag pans the image and must never change the image
+          const deltaX = pt.x - gestureState.lastPoint.x;
+          const deltaY = pt.y - gestureState.lastPoint.y;
+          gestureState.lastPoint = { ...pt };
+
+          const newX = panRef.current.x + deltaX;
+          const newY = panRef.current.y + deltaY;
+          const clamped = clampPan(scaleRef.current, newX, newY);
+          panRef.current = clamped;
+          applyTransform(false);
+        }
       }
-      return next;
+    };
+
+    const onPointerUp = (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch (_) { }
+
+      const rect = canvas.getBoundingClientRect();
+      const endPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      activePointers.delete(e.pointerId);
+
+      const remainingCount = activePointers.size;
+
+      // If one finger lifts after a pinch and the other is still down, keep panning and do not navigate
+      if (remainingCount === 1) {
+        const remainingPt = activePointers.values().next().value;
+        gestureState.lastPoint = { ...remainingPt };
+        return;
+      }
+
+      if (remainingCount === 0) {
+        setIsDragging(false);
+
+        // If scale ends below 1.02, snap back to exactly 1 with no offset
+        if (scaleRef.current < 1.02) {
+          scaleRef.current = 1;
+          panRef.current = { x: 0, y: 0 };
+          applyTransform(true);
+          setDisplayScale(1);
+        } else {
+          const clamped = clampPan(scaleRef.current, panRef.current.x, panRef.current.y);
+          panRef.current = clamped;
+          applyTransform(true);
+          setDisplayScale(scaleRef.current);
+        }
+
+        const now = Date.now();
+        const dxTotal = endPt.x - gestureState.startX;
+        const dyTotal = endPt.y - gestureState.startY;
+        const isTap = Math.hypot(dxTotal, dyTotal) < 15 && (now - gestureState.startTime) < 300 && !gestureState.hadMultiTouch;
+
+        // Double-tap toggles zoom (about 2.5x at tap point, or back to 1)
+        if (isTap) {
+          const timeSinceLastTap = now - gestureState.lastTapTime;
+          const distFromLastTap = Math.hypot(endPt.x - gestureState.lastTapPos.x, endPt.y - gestureState.lastTapPos.y);
+
+          if (timeSinceLastTap < 350 && distFromLastTap < 40) {
+            gestureState.lastTapTime = 0;
+            if (scaleRef.current > 1.05) {
+              scaleRef.current = 1;
+              panRef.current = { x: 0, y: 0 };
+              applyTransform(true);
+              setDisplayScale(1);
+            } else {
+              zoomAtPoint(2.5, endPt.x, endPt.y);
+            }
+            return;
+          } else {
+            gestureState.lastTapTime = now;
+            gestureState.lastTapPos = { ...endPt };
+          }
+        }
+
+        // Swipe left/right changes the image ONLY when not zoomed (scale <= 1.02)
+        // and the gesture never had two fingers down. Must be clearly horizontal (|dx| > 60px and |dx| > 1.5 * |dy|).
+        if (scaleRef.current <= 1.02 && !gestureState.hadMultiTouch) {
+          const absDx = Math.abs(dxTotal);
+          const absDy = Math.abs(dyTotal);
+          if (absDx > 60 && absDx > 1.5 * absDy) {
+            if (dxTotal < 0) {
+              handleNextRef.current?.();
+            } else {
+              handlePrevRef.current?.();
+            }
+          }
+        }
+      }
+    };
+
+    // Desktop mouse wheel zoom around cursor
+    const onWheel = (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      let newScale = scaleRef.current * zoomFactor;
+      newScale = Math.min(Math.max(newScale, 1), 5);
+
+      if (newScale < 1.02) {
+        scaleRef.current = 1;
+        panRef.current = { x: 0, y: 0 };
+        applyTransform(true);
+        setDisplayScale(1);
+        return;
+      }
+
+      const img = imgRef.current;
+      if (!img) return;
+
+      const cWidth = canvas.clientWidth;
+      const cHeight = canvas.clientHeight;
+      const iWidth = img.offsetWidth;
+      const iHeight = img.offsetHeight;
+      const left0 = (cWidth - iWidth) / 2;
+      const top0 = (cHeight - iHeight) / 2;
+
+      const uX = (cursorX - left0 - panRef.current.x) / scaleRef.current;
+      const uY = (cursorY - top0 - panRef.current.y) / scaleRef.current;
+
+      const newX = cursorX - left0 - newScale * uX;
+      const newY = cursorY - top0 - newScale * uY;
+
+      const clamped = clampPan(newScale, newX, newY);
+      scaleRef.current = newScale;
+      panRef.current = clamped;
+      applyTransform(false);
+      setDisplayScale(newScale);
+    };
+
+    // iOS Safari prevention of page-level pinch fighting the viewer
+    const preventGesture = (e) => e.preventDefault();
+
+    canvas.addEventListener("pointerdown", onPointerDown, { signal });
+    canvas.addEventListener("pointermove", onPointerMove, { signal });
+    canvas.addEventListener("pointerup", onPointerUp, { signal });
+    canvas.addEventListener("pointercancel", onPointerUp, { signal });
+    canvas.addEventListener("wheel", onWheel, { passive: false, signal });
+    canvas.addEventListener("gesturestart", preventGesture, { passive: false, signal });
+    canvas.addEventListener("gesturechange", preventGesture, { passive: false, signal });
+    canvas.addEventListener("gestureend", preventGesture, { passive: false, signal });
+
+    const onResize = () => {
+      if (scaleRef.current > 1) {
+        const clamped = clampPan(scaleRef.current, panRef.current.x, panRef.current.y);
+        panRef.current = clamped;
+        applyTransform(false);
+      }
+    };
+    window.addEventListener("resize", onResize, { signal });
+
+    // Initial transform application when canvas mounts
+    requestAnimationFrame(() => {
+      applyTransform(false);
     });
-  };
 
-  const handleResetZoom = () => {
-    setZoomScale(1);
-    setPanX(0);
-    setPanY(0);
-  };
+    return () => {
+      ac.abort();
+    };
+  }, [lightboxData, applyTransform, clampPan, zoomAtPoint]);
 
   return (
     <>
@@ -1336,7 +1662,7 @@ const Forecast = () => {
                         : `${formatClusterLabel(activeClusterItem?.atcf_id || activeClusterItem?.storm_id || selectedClusterId)}`}
                     </h3>
                     <span className="cluster-subtitle">
-                      AI Cyclogenesis Ensemble Spaghetti Tracking • PAR / WestPac Area
+                      AI Cyclogenesis Ensemble Spaghetti Tracking
                     </span>
                   </div>
 
@@ -1757,8 +2083,6 @@ const Forecast = () => {
           <div
             className="lightbox-overlay"
             onClick={closeLightbox}
-            onTouchStart={handleLightboxTouchStart}
-            onTouchEnd={handleLightboxTouchEnd}
           >
             {/* Top Navigation Bar: Brand Pill on Left, Model Switcher in Center, Zoom & Close on Right */}
             <div className="lightbox-top-bar" onClick={(e) => e.stopPropagation()}>
@@ -1774,28 +2098,29 @@ const Forecast = () => {
               </div>
 
               {lightboxData?.isCluster ? (
-                clusterManifest.length > 1 && (
+                activeLightboxClusterList.length > 1 && (
                   <div className="lightbox-model-tabs-center">
-                    {clusterManifest.map((item, idx) => (
-                      <button
-                        key={item.filename || idx}
-                        className={`lightbox-tab-pill ${idx === lightboxIndex ? "active" : ""}`}
-                        onClick={() => {
-                          setLightboxIndex(idx);
-                          setLightboxData({
-                            src: getAssetUrl(`/assets/${item.filename}`),
-                            title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
-                            isCluster: true,
-                            item
-                          });
-                          setZoomScale(1);
-                          setPanX(0);
-                          setPanY(0);
-                        }}
-                      >
-                        {formatClusterLabel(item.atcf_id || item.storm_id)} ({item.model === "gdm_wnc_large" ? "Large" : "WNCv3"})
-                      </button>
-                    ))}
+                    {activeLightboxClusterList.map((item, idx) => {
+                      const clusterId = item.atcf_id || item.storm_id;
+                      const isCurrent = (lightboxData.item?.atcf_id || lightboxData.item?.storm_id) === clusterId;
+                      return (
+                        <button
+                          key={item.filename || idx}
+                          className={`lightbox-tab-pill ${isCurrent ? "active" : ""}`}
+                          onClick={() => {
+                            setLightboxIndex(idx);
+                            setLightboxData({
+                              src: getAssetUrl(`/assets/${item.filename}`),
+                              title: `${formatClusterLabel(clusterId)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                              isCluster: true,
+                              item
+                            });
+                          }}
+                        >
+                          {formatClusterLabel(clusterId)}
+                        </button>
+                      );
+                    })}
                   </div>
                 )
               ) : (
@@ -1811,9 +2136,6 @@ const Forecast = () => {
                             src: item.track.imageSrc,
                             title: `${item.model.name} (${selectedType.toUpperCase()})`
                           });
-                          setZoomScale(1);
-                          setPanX(0);
-                          setPanY(0);
                         }}
                       >
                         {item.model.name}
@@ -1824,7 +2146,7 @@ const Forecast = () => {
               )}
 
               <div className="lightbox-top-actions">
-                <span className="zoom-value-text">Zoom: {zoomScale.toFixed(1)}x</span>
+                <span className="zoom-value-text">Zoom: {displayScale.toFixed(1)}x</span>
                 <button className="top-action-btn" onClick={handleZoomIn} title="Zoom In">
                   <ZoomIn size={15} />
                 </button>
@@ -1845,67 +2167,57 @@ const Forecast = () => {
               ref={canvasRef}
               className={`lightbox-canvas ${isDragging ? "dragging" : ""}`}
               onClick={(e) => e.stopPropagation()}
-              onMouseDown={handleDragStart}
-              onMouseMove={handleDragMove}
-              onMouseUp={handleDragEnd}
-              onMouseLeave={handleDragEnd}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
             >
               <img
+                ref={imgRef}
                 src={lightboxData.src}
                 alt={lightboxData.title}
                 className="lightbox-img"
-                style={{
-                  transform: `translate(${panX}px, ${panY}px) scale(${zoomScale})`,
-                  transition: isDragging ? "none" : "transform 0.15s ease-out",
-                }}
               />
             </div>
 
             {/* Bottom Stepper Pill Bar: < Prev • Dots • Next > */}
-            {(lightboxData?.isCluster ? clusterManifest.length > 1 : availableGridItems.length > 1) && (
+            {(lightboxData?.isCluster ? activeLightboxClusterList.length > 1 : availableGridItems.length > 1) && (
               <div className="lightbox-bottom-stepper" onClick={(e) => e.stopPropagation()}>
-                <button className="stepper-btn" onClick={handlePrevLightbox}>
-                  <ChevronLeft size={15} />
+                <button className="stepper-btn" onClick={handlePrevLightbox} aria-label="Previous">
+                  <ChevronLeft size={16} />
                   <span>Prev</span>
                 </button>
 
                 <div className="stepper-dots">
-                  {(lightboxData?.isCluster ? clusterManifest : availableGridItems).map((_, idx) => (
-                    <span
-                      key={idx}
-                      className={`stepper-dot ${idx === lightboxIndex ? "active" : ""}`}
-                      onClick={() => {
-                        if (lightboxData?.isCluster) {
-                          const item = clusterManifest[idx];
-                          setLightboxIndex(idx);
-                          setLightboxData({
-                            src: getAssetUrl(`/assets/${item.filename}`),
-                            title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
-                            isCluster: true,
-                            item
-                          });
-                        } else {
-                          const item = availableGridItems[idx];
-                          setLightboxIndex(idx);
-                          setLightboxData({
-                            src: item.track.imageSrc,
-                            title: `${item.model.name} (${selectedType.toUpperCase()})`
-                          });
-                        }
-                        setZoomScale(1);
-                        setPanX(0);
-                        setPanY(0);
-                      }}
-                    />
-                  ))}
+                  {(lightboxData?.isCluster ? activeLightboxClusterList : availableGridItems).map((item, idx) => {
+                    const isActive = lightboxData?.isCluster
+                      ? (lightboxData.item?.atcf_id || lightboxData.item?.storm_id) === (item.atcf_id || item.storm_id)
+                      : idx === lightboxIndex;
+                    return (
+                      <span
+                        key={idx}
+                        className={`stepper-dot ${isActive ? "active" : ""}`}
+                        onClick={() => {
+                          if (lightboxData?.isCluster) {
+                            setLightboxIndex(idx);
+                            setLightboxData({
+                              src: getAssetUrl(`/assets/${item.filename}`),
+                              title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                              isCluster: true,
+                              item
+                            });
+                          } else {
+                            setLightboxIndex(idx);
+                            setLightboxData({
+                              src: item.track.imageSrc,
+                              title: `${item.model.name} (${selectedType.toUpperCase()})`
+                            });
+                          }
+                        }}
+                      />
+                    );
+                  })}
                 </div>
 
-                <button className="stepper-btn" onClick={handleNextLightbox}>
+                <button className="stepper-btn" onClick={handleNextLightbox} aria-label="Next">
                   <span>Next</span>
-                  <ChevronRight size={15} />
+                  <ChevronRight size={16} />
                 </button>
               </div>
             )}
