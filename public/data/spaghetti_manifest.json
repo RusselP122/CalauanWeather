@@ -334,5 +334,77 @@
     "alt_filename": "MONITORING_LPA03_20261008_12Z_gdm_wncv3.png",
     "is_monitoring": true,
     "timestamp": "2026-10-08T23:36:23.075233+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261008",
+    "cycle": "18Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA01_20261008T18Z",
+    "filename": "MONITORING_LPA01_20261008_18Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA01_20261008_18Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-09T02:03:35.414476+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261008",
+    "cycle": "18Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA02_20261008T18Z",
+    "filename": "MONITORING_LPA02_20261008_18Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA02_20261008_18Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-09T02:03:36.551793+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261008",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA01_20261008T18Z",
+    "filename": "MONITORING_LPA01_20261008_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA01_20261008_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-09T02:04:13.966344+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261008",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA02_20261008T18Z",
+    "filename": "MONITORING_LPA02_20261008_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA02_20261008_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-09T02:04:22.308338+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA03",
+    "atcf_id": "LPA03",
+    "init_date": "20261008",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA03_20261008T18Z",
+    "filename": "MONITORING_LPA03_20261008_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA03_20261008_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-09T02:04:25.397159+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA04",
+    "atcf_id": "LPA04",
+    "init_date": "20261008",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA04_20261008T18Z",
+    "filename": "MONITORING_LPA04_20261008_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA04_20261008_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-09T02:04:27.592910+00:00"
   }
 ]
