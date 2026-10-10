@@ -1826,28 +1826,15 @@ def plot_model_tracks(
     ))
 
     # Canonical Sea Text Labels (zorder=3 so track lines pass over them)
+    lon_span = view_lon_max - view_lon_min
     if view_lon_min + 1.0 <= 118.0 <= view_lon_max - 1.0 and view_lat_min + 1.0 <= 14.0 <= view_lat_max - 1.0:
+        is_zoomed_out = lon_span >= 38.0
+        wps_text = 'West\nPhilippine\nSea' if is_zoomed_out else 'West Philippine\nSea'
+        wps_fs = 5.0 if is_zoomed_out else 7.5
         ax_map.text(
-            118.0, 14.0, 'West Philippine\nSea', fontsize=8.0, color='#94a3b8', weight='bold',
-            transform=ccrs.PlateCarree(), ha='center', va='center', style='italic', alpha=0.65, zorder=3, clip_on=True
-        )
-
-    if view_lon_min + 1.0 <= 113.0 <= view_lon_max - 1.0 and view_lat_min + 1.0 <= 14.0 <= view_lat_max - 1.0:
-        ax_map.text(
-            113.0, 14.0, 'South China\nSea', fontsize=8.0, color='#94a3b8', weight='bold',
-            transform=ccrs.PlateCarree(), ha='center', va='center', style='italic', alpha=0.65, zorder=3, clip_on=True
-        )
-
-    if view_lon_min + 0.8 <= 120.0 <= view_lon_max - 0.8 and view_lat_min + 0.8 <= 9.0 <= view_lat_max - 0.8:
-        ax_map.text(
-            120.0, 9.0, 'Sulu\nSea', fontsize=7.5, color='#94a3b8', weight='bold',
-            transform=ccrs.PlateCarree(), ha='center', va='center', style='italic', alpha=0.65, zorder=3, clip_on=True
-        )
-
-    if view_lon_min + 0.8 <= 122.5 <= view_lon_max - 0.8 and view_lat_min + 0.8 <= 4.0 <= view_lat_max - 0.8:
-        ax_map.text(
-            122.5, 4.0, 'Celebes\nSea', fontsize=7.5, color='#94a3b8', weight='bold',
-            transform=ccrs.PlateCarree(), ha='center', va='center', style='italic', alpha=0.65, zorder=3, clip_on=True
+            118.0, 14.0, wps_text, fontsize=wps_fs, color='#94a3b8', weight='bold',
+            transform=ccrs.PlateCarree(), ha='center', va='center', style='italic',
+            linespacing=0.88, alpha=0.65, zorder=3, clip_on=True
         )
 
     if view_lon_min + 1.5 <= 130.5 <= view_lon_max - 1.5 and view_lat_min + 1.0 <= 18.5 <= view_lat_max - 1.0:
