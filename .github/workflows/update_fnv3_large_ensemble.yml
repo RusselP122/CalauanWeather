@@ -75,6 +75,10 @@ jobs:
         run: |
           python plot_monitoring_spaghetti.py
 
+      - name: Generate Active Storm Ensemble Spaghetti Graphics
+        run: |
+          python plot_ensemble_spaghetti.py
+
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"

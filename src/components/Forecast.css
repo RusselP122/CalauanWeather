@@ -1440,6 +1440,150 @@
   }
 }
 
+/* Active Storm Horizon Button */
+.horizon-storm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  position: relative;
+  overflow: hidden;
+  font-weight: 700;
+}
+
+.storm-radar-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f43f5e;
+  box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+  animation: stormRadarPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes stormRadarPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(244, 63, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
+}
+
+.storm-badge-count {
+  font-size: 0.65rem;
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  padding: 0.1rem 0.35rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.horizon-storm-btn.active {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.22), rgba(251, 113, 133, 0.22)) !important;
+  color: #fff1f2 !important;
+  border: 1px solid rgba(244, 63, 94, 0.5) !important;
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.3) !important;
+}
+
+.horizon-storm-btn.active .storm-radar-pulse {
+  background: #ff0055;
+  animation: stormRadarPulseActive 1.5s infinite;
+}
+
+@keyframes stormRadarPulseActive {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.8);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 0, 85, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 85, 0);
+  }
+}
+
+/* Storm Panel Styling */
+.storm-panel {
+  border-color: rgba(244, 63, 94, 0.15);
+}
+
+.storm-status-pill {
+  background: rgba(244, 63, 94, 0.12) !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+  color: #fb7185 !important;
+}
+
+.storm-status-dot {
+  background: #f43f5e !important;
+  box-shadow: 0 0 8px #f43f5e !important;
+}
+
+.storm-strip-label {
+  color: #fb7185 !important;
+}
+
+.storm-chip {
+  border-color: rgba(244, 63, 94, 0.15);
+}
+
+.storm-chip:hover {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.08);
+}
+
+.storm-chip.active {
+  background: rgba(244, 63, 94, 0.18) !important;
+  border-color: rgba(244, 63, 94, 0.55) !important;
+  color: #fff1f2 !important;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.25);
+}
+
+.storm-chip-indicator {
+  background: #f43f5e !important;
+  box-shadow: 0 0 6px #f43f5e !important;
+}
+
+.storm-chip-cat {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(244, 63, 94, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  text-transform: uppercase;
+}
+
+.storm-live-tag {
+  background: rgba(244, 63, 94, 0.15) !important;
+  color: #fb7185 !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+
+.storm-shortcuts-hint-box {
+  border-color: rgba(244, 63, 94, 0.2) !important;
+}
+
+.storm-shortcuts-hint-box:hover {
+  background: rgba(244, 63, 94, 0.08) !important;
+  border-color: rgba(244, 63, 94, 0.4) !important;
+}
+
+.lightbox-tab-pill.storm-tab-pill.active {
+  background: rgba(244, 63, 94, 0.25) !important;
+  border-color: rgba(244, 63, 94, 0.5) !important;
+  color: #fff1f2 !important;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.35) !important;
+}
+
 /* Cluster Panel Main Container */
 .cluster-panel {
   display: flex;

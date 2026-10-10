@@ -34,6 +34,22 @@ const formatClusterLabel = (id) => {
   return clean ? `Cluster ${clean}` : "Cluster 01";
 };
 
+// Clean formatting helper for Active Storms (e.g. '27W' -> 'TC 27W (KOGUMA)', '95W' -> 'INVEST 95W')
+const formatStormDisplayName = (id, stormInfo = null) => {
+  if (!id) return "Active Storm";
+  if (stormInfo?.storm_name) return stormInfo.storm_name;
+  const clean = String(id).toUpperCase().trim();
+  if (clean.includes("95") || clean === "WP95" || clean === "95W") return "INVEST 95W";
+  if (clean.includes("27") || clean === "WP27" || clean === "27W") return "TC 27W (KOGUMA)";
+  if (/^WP?9\d/i.test(clean) || /^9\dW?$/i.test(clean)) {
+    return `INVEST ${clean.replace(/\D/g, "")}W`;
+  }
+  if (/^WP?\d{1,2}/i.test(clean) || /^\d{1,2}W?$/i.test(clean)) {
+    return `TC ${clean.replace(/\D/g, "")}W`;
+  }
+  return clean;
+};
+
 // Fallback seed entries in case manifest is fetching or temporarily offline
 const DEFAULT_CLUSTER_ENTRIES = [
   {
@@ -390,7 +406,7 @@ const Forecast = () => {
       });
   }, []);
 
-  const [selectedType, setSelectedType] = useState("5day"); // '5day' | '15day' | 'cluster'
+  const [selectedType, setSelectedType] = useState("5day"); // '5day' | '15day' | 'cluster' | 'storm'
   const [selectedModelTime, setSelectedModelTime] = useState(allPossibleCycles[0]);
   const [expandedSpecs, setExpandedSpecs] = useState(null);
   const [hasManuallySelected, setHasManuallySelected] = useState(false);
@@ -403,7 +419,13 @@ const Forecast = () => {
   const [isClusterSplitView, setIsClusterSplitView] = useState(false);
   const [showClusterHelp, setShowClusterHelp] = useState(false);
 
-  // Fetch real-time Under-Monitoring Cluster Manifest
+  // Active Storm (plot_ensemble) Specific States
+  const [activeStormModel, setActiveStormModel] = useState("gdm_wncv3"); // 'gdm_wnc_large' | 'gdm_wncv3'
+  const [selectedStormRun, setSelectedStormRun] = useState("");
+  const [selectedEnsembleStormId, setSelectedEnsembleStormId] = useState("27W");
+  const [isStormSplitView, setIsStormSplitView] = useState(false);
+
+  // Fetch real-time Under-Monitoring Cluster & Active Storm Manifest
   useEffect(() => {
     fetch(getAssetUrl("/data/spaghetti_manifest.json"))
       .then((res) => {
@@ -413,27 +435,64 @@ const Forecast = () => {
       .then((json) => {
         if (Array.isArray(json) && json.length > 0) {
           setClusterManifest(json);
-          // Extract unique runs: `${init_date}_${cycle}` sorted chronologically newest first
-          const runs = Array.from(
-            new Set(
-              json.map((j) => {
-                const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-                const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
-                return `${d}_${c}`;
-              })
-            )
-          ).sort((a, b) => b.localeCompare(a));
 
-          const latestRun = runs[0] || "";
-          setSelectedClusterRun(latestRun);
+          // 1. Cluster items (Under-Monitoring LPAs)
+          const clusterItems = json.filter(
+            (j) => j.is_monitoring || j.storm_id?.startsWith("MONITORING_")
+          );
+          if (clusterItems.length > 0) {
+            const runs = Array.from(
+              new Set(
+                clusterItems.map((j) => {
+                  const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+                  const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+                  return `${d}_${c}`;
+                })
+              )
+            ).sort((a, b) => b.localeCompare(a));
 
-          const itemsInLatestRun = json.filter((j) => {
-            const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
-            const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
-            return `${d}_${c}` === latestRun;
-          });
-          const firstLpa = itemsInLatestRun[0]?.atcf_id || itemsInLatestRun[0]?.storm_id || json[0].atcf_id || json[0].storm_id;
-          if (firstLpa) setSelectedClusterId(firstLpa);
+            const latestRun = runs[0] || "";
+            setSelectedClusterRun(latestRun);
+
+            const itemsInLatestRun = clusterItems.filter((j) => {
+              const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
+              const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+              return `${d}_${c}` === latestRun;
+            });
+            const firstLpa = itemsInLatestRun[0]?.atcf_id || itemsInLatestRun[0]?.storm_id || clusterItems[0].atcf_id || clusterItems[0].storm_id;
+            if (firstLpa) setSelectedClusterId(firstLpa);
+          }
+
+          // 2. Active Storm items (Official ATCF & Invests from plot_ensemble)
+          const stormItems = json.filter(
+            (j) => !j.is_monitoring && !j.storm_id?.startsWith("MONITORING_")
+          );
+          if (stormItems.length > 0) {
+            const stormRuns = Array.from(
+              new Set(
+                stormItems.map((j) => {
+                  const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261009");
+                  const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+                  return `${d}_${c}`;
+                })
+              )
+            ).sort((a, b) => b.localeCompare(a));
+
+            const latestStormRun = stormRuns[0] || "";
+            setSelectedStormRun(latestStormRun);
+
+            const itemsInLatestStormRun = stormItems.filter((j) => {
+              const d = j.init_date || (j.unique_key?.match(/(\d{8})T/)?.[1] || "20261009");
+              const c = j.cycle || (j.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+              return `${d}_${c}` === latestStormRun;
+            });
+            const firstStorm =
+              itemsInLatestStormRun[0]?.atcf_id ||
+              itemsInLatestStormRun[0]?.storm_id ||
+              stormItems[0].atcf_id ||
+              stormItems[0].storm_id;
+            if (firstStorm) setSelectedEnsembleStormId(firstStorm);
+          }
         }
       })
       .catch(() => { });
@@ -550,7 +609,10 @@ const Forecast = () => {
 
   // Available initialization runs in cluster manifest strictly for the latest init date & standard cycles (00Z, 06Z, 12Z, 18Z)
   const availableClusterRuns = useMemo(() => {
-    if (!clusterManifest || clusterManifest.length === 0) return [];
+    const clusterItems = clusterManifest.filter(
+      (m) => m.is_monitoring || m.storm_id?.startsWith("MONITORING_")
+    );
+    if (!clusterItems || clusterItems.length === 0) return [];
 
     const STANDARD_CYCLES = ["00Z", "06Z", "12Z", "18Z"];
 
@@ -582,7 +644,7 @@ const Forecast = () => {
       const v3Pairs = new Set();
       const largePairs = new Set();
 
-      clusterManifest.forEach((item) => {
+      clusterItems.forEach((item) => {
         const c = getItemCycle(item);
         const d = getItemDate(item);
         if (!STANDARD_CYCLES.includes(c) || !d) return;
@@ -608,20 +670,20 @@ const Forecast = () => {
             .filter((p) => p.startsWith(`${latestDate}_`))
             .map((p) => p.split("_")[1])
         );
-        candidateItems = clusterManifest.filter((m) => {
+        candidateItems = clusterItems.filter((m) => {
           const d = getItemDate(m);
           const c = getItemCycle(m);
           return d === latestDate && allowedCycles.has(c);
         });
       } else {
         // Fallback: if no date is shared by both, use latest date across manifest
-        const allDates = Array.from(new Set(clusterManifest.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+        const allDates = Array.from(new Set(clusterItems.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
         latestDate = allDates[0] || "";
-        candidateItems = clusterManifest.filter((m) => getItemDate(m) === latestDate);
+        candidateItems = clusterItems.filter((m) => getItemDate(m) === latestDate);
       }
     } else {
       // Single Model mode: each model shows its OWN latest date
-      const modelItems = clusterManifest.filter((item) => {
+      const modelItems = clusterItems.filter((item) => {
         const c = getItemCycle(item);
         return item.model === clusterModel && STANDARD_CYCLES.includes(c);
       });
@@ -676,11 +738,139 @@ const Forecast = () => {
     }
   }, [availableClusterRuns, selectedClusterRun]);
 
+  // Available initialization runs strictly for Active Storms (plot_ensemble)
+  const availableStormRuns = useMemo(() => {
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+    if (!stormItems || stormItems.length === 0) return [];
+
+    const STANDARD_CYCLES = ["00Z", "06Z", "12Z", "18Z"];
+
+    const getItemDate = (item) => {
+      return item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "");
+    };
+
+    const getItemCycle = (item) => {
+      return item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+    };
+
+    const formatDateLabel = (d) => {
+      if (d && d.length === 8) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const mIdx = parseInt(d.slice(4, 6), 10) - 1;
+        const day = parseInt(d.slice(6, 8), 10);
+        if (mIdx >= 0 && mIdx < 12) {
+          return `${months[mIdx]} ${day}`;
+        }
+      }
+      return d;
+    };
+
+    let latestDate = "";
+    let candidateItems = [];
+
+    if (isStormSplitView) {
+      const v3Pairs = new Set();
+      const largePairs = new Set();
+
+      stormItems.forEach((item) => {
+        const c = getItemCycle(item);
+        const d = getItemDate(item);
+        if (!STANDARD_CYCLES.includes(c) || !d) return;
+
+        if (item.model === "gdm_wncv3") {
+          v3Pairs.add(`${d}_${c}`);
+        } else if (item.model === "gdm_wnc_large") {
+          largePairs.add(`${d}_${c}`);
+        }
+      });
+
+      const commonPairs = Array.from(v3Pairs).filter((pair) => largePairs.has(pair));
+      const commonDates = Array.from(new Set(commonPairs.map((pair) => pair.split("_")[0])));
+
+      if (commonDates.length > 0) {
+        commonDates.sort((a, b) => b.localeCompare(a));
+        latestDate = commonDates[0];
+        const allowedCycles = new Set(
+          commonPairs
+            .filter((p) => p.startsWith(`${latestDate}_`))
+            .map((p) => p.split("_")[1])
+        );
+        candidateItems = stormItems.filter((m) => {
+          const d = getItemDate(m);
+          const c = getItemCycle(m);
+          return d === latestDate && allowedCycles.has(c);
+        });
+      } else {
+        const allDates = Array.from(new Set(stormItems.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+        latestDate = allDates[0] || "";
+        candidateItems = stormItems.filter((m) => getItemDate(m) === latestDate);
+      }
+    } else {
+      const modelItems = stormItems.filter((item) => {
+        const c = getItemCycle(item);
+        return item.model === activeStormModel && STANDARD_CYCLES.includes(c);
+      });
+
+      const modelDates = Array.from(new Set(modelItems.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+      latestDate = modelDates[0] || "";
+
+      candidateItems = modelItems.filter((m) => getItemDate(m) === latestDate);
+    }
+
+    if (!latestDate) {
+      const allDates = Array.from(new Set(stormItems.map(getItemDate).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+      latestDate = allDates[0] || "";
+      candidateItems = stormItems.filter((m) => getItemDate(m) === latestDate);
+    }
+
+    if (!latestDate) return [];
+
+    const dateLabel = formatDateLabel(latestDate);
+
+    const availableCyclesSet = new Set(
+      candidateItems
+        .map(getItemCycle)
+        .filter((c) => STANDARD_CYCLES.includes(c))
+    );
+
+    const sortedCycles = STANDARD_CYCLES.filter((c) => availableCyclesSet.has(c));
+    const isSingleCycle = sortedCycles.length === 1;
+
+    return sortedCycles.map((c) => ({
+      key: `${latestDate}_${c}`,
+      init_date: latestDate,
+      cycle: c,
+      dateLabel,
+      displayLabel: isSingleCycle ? `${dateLabel} · ${c}` : c,
+    }));
+  }, [clusterManifest, isStormSplitView, activeStormModel]);
+
+  const newestStormRun = availableStormRuns[availableStormRuns.length - 1];
+  const activeStormRunKey = availableStormRuns.some((r) => r.key === selectedStormRun)
+    ? selectedStormRun
+    : newestStormRun?.key || "";
+
+  useEffect(() => {
+    if (availableStormRuns.length > 0) {
+      const exists = availableStormRuns.some((r) => r.key === selectedStormRun);
+      if (!exists) {
+        const newest = availableStormRuns[availableStormRuns.length - 1];
+        if (newest) {
+          setSelectedStormRun(newest.key);
+        }
+      }
+    }
+  }, [availableStormRuns, selectedStormRun]);
+
   // Derived cluster lists formatted as 'Cluster 01', 'Cluster 02', etc.
-  // Filtered by activeClusterRunKey AND (in single-model view) by active clusterModel!
   const availableClusterList = useMemo(() => {
     const map = new Map();
-    const runFiltered = clusterManifest.filter((item) => {
+    const clusterItems = clusterManifest.filter(
+      (item) => item.is_monitoring || item.storm_id?.startsWith("MONITORING_")
+    );
+    const runFiltered = clusterItems.filter((item) => {
       if (!activeClusterRunKey) return true;
       const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
       const c = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
@@ -688,7 +878,6 @@ const Forecast = () => {
     });
 
     runFiltered.forEach((item) => {
-      // In single model view, only show clusters available for the selected model!
       if (!isClusterSplitView && item.model !== clusterModel) {
         return;
       }
@@ -717,15 +906,75 @@ const Forecast = () => {
     }
   }, [availableClusterList, selectedClusterId]);
 
+  // Derived Active Storms list (from plot_ensemble)
+  const availableActiveStormsList = useMemo(() => {
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+    const map = new Map();
+
+    const runFiltered = stormItems.filter((item) => {
+      if (!activeStormRunKey) return true;
+      const d = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "");
+      const c = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+      return `${d}_${c}` === activeStormRunKey;
+    });
+
+    const itemsToScan = runFiltered.length > 0 ? runFiltered : stormItems;
+
+    itemsToScan.forEach((item) => {
+      if (!isStormSplitView && item.model !== activeStormModel && runFiltered.some((r) => r.model === activeStormModel)) {
+        if (!runFiltered.some((r) => (r.atcf_id === item.atcf_id || r.storm_id === item.storm_id) && r.model === activeStormModel)) {
+          return;
+        }
+      }
+      const key = item.atcf_id || item.storm_id;
+      if (!map.has(key)) {
+        const stormInfo = stormsIndex.find((s) =>
+          s.track_id?.toUpperCase().includes(key.toUpperCase()) ||
+          s.storm_name?.toUpperCase().includes(key.toUpperCase()) ||
+          key.toUpperCase().includes(s.track_id?.slice(0, 4).toUpperCase())
+        );
+        const label = formatStormDisplayName(key, stormInfo);
+        const category = stormInfo?.category || (/^WP?9/i.test(key) || /^9\dW?$/i.test(key) ? "INVEST" : "TROPICAL CYCLONE");
+        map.set(key, {
+          id: key,
+          label,
+          fullName: label,
+          category,
+          models: []
+        });
+      }
+      if (!map.get(key).models.includes(item.model)) {
+        map.get(key).models.push(item.model);
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [clusterManifest, activeStormRunKey, isStormSplitView, activeStormModel, stormsIndex]);
+
+  // Auto-snap selected storm ID
+  useEffect(() => {
+    if (availableActiveStormsList.length > 0) {
+      const exists = availableActiveStormsList.some((s) => s.id === selectedEnsembleStormId);
+      if (!exists) {
+        setSelectedEnsembleStormId(availableActiveStormsList[0].id);
+      }
+    }
+  }, [availableActiveStormsList, selectedEnsembleStormId]);
+
   const activeClusterItem = useMemo(() => {
-    if (!clusterManifest.length) return null;
+    const clusterItems = clusterManifest.filter(
+      (m) => m.is_monitoring || m.storm_id?.startsWith("MONITORING_")
+    );
+    if (!clusterItems.length) return null;
     const runItems = activeClusterRunKey
-      ? clusterManifest.filter((m) => {
+      ? clusterItems.filter((m) => {
         const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
         const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
         return `${d}_${c}` === activeClusterRunKey;
       })
-      : clusterManifest;
+      : clusterItems;
 
     let match = runItems.find(
       (m) => m.model === clusterModel && (m.atcf_id === selectedClusterId || m.storm_id === selectedClusterId)
@@ -734,19 +983,22 @@ const Forecast = () => {
       match = runItems.find((m) => m.model === clusterModel);
     }
     if (!match) {
-      match = runItems[0] || clusterManifest[0];
+      match = runItems[0] || clusterItems[0];
     }
     return match;
   }, [clusterManifest, activeClusterRunKey, clusterModel, selectedClusterId]);
 
   const splitV3Item = useMemo(() => {
+    const clusterItems = clusterManifest.filter(
+      (m) => m.is_monitoring || m.storm_id?.startsWith("MONITORING_")
+    );
     const runItems = activeClusterRunKey
-      ? clusterManifest.filter((m) => {
+      ? clusterItems.filter((m) => {
         const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
         const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
         return `${d}_${c}` === activeClusterRunKey;
       })
-      : clusterManifest;
+      : clusterItems;
 
     return (
       runItems.find(
@@ -756,13 +1008,16 @@ const Forecast = () => {
   }, [clusterManifest, activeClusterRunKey, selectedClusterId]);
 
   const splitLargeItem = useMemo(() => {
+    const clusterItems = clusterManifest.filter(
+      (m) => m.is_monitoring || m.storm_id?.startsWith("MONITORING_")
+    );
     const runItems = activeClusterRunKey
-      ? clusterManifest.filter((m) => {
+      ? clusterItems.filter((m) => {
         const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "20261008");
         const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
         return `${d}_${c}` === activeClusterRunKey;
       })
-      : clusterManifest;
+      : clusterItems;
 
     return (
       runItems.find(
@@ -785,6 +1040,122 @@ const Forecast = () => {
     setSelectedClusterId(availableClusterList[prevIdx].id);
   }, [availableClusterList, selectedClusterId]);
 
+  // Active Storm single item
+  const activeStormItem = useMemo(() => {
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+    if (!stormItems.length) return null;
+
+    const runItems = activeStormRunKey
+      ? stormItems.filter((m) => {
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        return `${d}_${c}` === activeStormRunKey;
+      })
+      : stormItems;
+
+    let match = runItems.find(
+      (m) =>
+        m.model === activeStormModel &&
+        (m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId)
+    );
+    if (!match) {
+      match = runItems.find(
+        (m) => m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId
+      );
+    }
+    if (!match) {
+      match = stormItems.find(
+        (m) =>
+          m.model === activeStormModel &&
+          (m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId)
+      );
+    }
+    if (!match) {
+      match = runItems[0] || stormItems[0];
+    }
+    return match;
+  }, [clusterManifest, activeStormRunKey, activeStormModel, selectedEnsembleStormId]);
+
+  const splitStormV3Item = useMemo(() => {
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+    const runItems = activeStormRunKey
+      ? stormItems.filter((m) => {
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        return `${d}_${c}` === activeStormRunKey;
+      })
+      : stormItems;
+
+    return (
+      runItems.find(
+        (m) =>
+          m.model === "gdm_wncv3" &&
+          (m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId)
+      ) ||
+      stormItems.find(
+        (m) =>
+          m.model === "gdm_wncv3" &&
+          (m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId)
+      ) ||
+      null
+    );
+  }, [clusterManifest, activeStormRunKey, selectedEnsembleStormId]);
+
+  const splitStormLargeItem = useMemo(() => {
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+    const runItems = activeStormRunKey
+      ? stormItems.filter((m) => {
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        return `${d}_${c}` === activeStormRunKey;
+      })
+      : stormItems;
+
+    return (
+      runItems.find(
+        (m) =>
+          m.model === "gdm_wnc_large" &&
+          (m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId)
+      ) ||
+      stormItems.find(
+        (m) =>
+          m.model === "gdm_wnc_large" &&
+          (m.atcf_id === selectedEnsembleStormId || m.storm_id === selectedEnsembleStormId)
+      ) ||
+      null
+    );
+  }, [clusterManifest, activeStormRunKey, selectedEnsembleStormId]);
+
+  const handleNextStorm = useCallback(() => {
+    if (!availableActiveStormsList.length) return;
+    const currIdx = availableActiveStormsList.findIndex((s) => s.id === selectedEnsembleStormId);
+    const nextIdx = (currIdx + 1) % availableActiveStormsList.length;
+    setSelectedEnsembleStormId(availableActiveStormsList[nextIdx].id);
+  }, [availableActiveStormsList, selectedEnsembleStormId]);
+
+  const handlePrevStorm = useCallback(() => {
+    if (!availableActiveStormsList.length) return;
+    const currIdx = availableActiveStormsList.findIndex((s) => s.id === selectedEnsembleStormId);
+    const prevIdx = (currIdx - 1 + availableActiveStormsList.length) % availableActiveStormsList.length;
+    setSelectedEnsembleStormId(availableActiveStormsList[prevIdx].id);
+  }, [availableActiveStormsList, selectedEnsembleStormId]);
+
+  const stormTouchStartX = useRef(0);
+  const handleStormTouchStart = (e) => {
+    stormTouchStartX.current = e.touches[0].clientX;
+  };
+  const handleStormTouchEnd = (e) => {
+    const diff = e.changedTouches[0].clientX - stormTouchStartX.current;
+    if (diff > 50) handlePrevStorm();
+    else if (diff < -50) handleNextStorm();
+  };
+
   // Filter cluster list in Lightbox strictly by the currently displayed model (Large vs WNCv3) and cycle!
   const activeLightboxClusterList = useMemo(() => {
     if (!lightboxData?.isCluster) return [];
@@ -793,7 +1164,11 @@ const Forecast = () => {
     const itemCycle = lightboxData.item?.cycle || (lightboxData.item?.unique_key?.includes("T06Z") ? "06Z" : "00Z");
     const runToUse = itemDate && itemCycle ? `${itemDate}_${itemCycle}` : activeClusterRunKey;
 
-    const filtered = clusterManifest.filter((m) => {
+    const clusterItems = clusterManifest.filter(
+      (m) => m.is_monitoring || m.storm_id?.startsWith("MONITORING_")
+    );
+
+    const filtered = clusterItems.filter((m) => {
       if (m.model !== modelToUse) return false;
       if (runToUse) {
         const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
@@ -828,7 +1203,11 @@ const Forecast = () => {
     const itemCycle = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
     const runToUse = itemDate && itemCycle ? `${itemDate}_${itemCycle}` : activeClusterRunKey;
 
-    const list = clusterManifest.filter((m) => {
+    const clusterItems = clusterManifest.filter(
+      (m) => m.is_monitoring || m.storm_id?.startsWith("MONITORING_")
+    );
+
+    const list = clusterItems.filter((m) => {
       if (m.model !== modelToUse) return false;
       if (runToUse) {
         const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
@@ -860,6 +1239,91 @@ const Forecast = () => {
     });
   };
 
+  // Filter Active Storms list in Lightbox
+  const activeLightboxStormList = useMemo(() => {
+    if (!lightboxData?.isStorm) return [];
+    const modelToUse = lightboxData.item?.model || activeStormModel;
+    const itemDate = lightboxData.item?.init_date || (lightboxData.item?.unique_key?.match(/(\d{8})T/)?.[1] || "");
+    const itemCycle = lightboxData.item?.cycle || (lightboxData.item?.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+    const runToUse = itemDate && itemCycle ? `${itemDate}_${itemCycle}` : activeStormRunKey;
+
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+
+    const filtered = stormItems.filter((m) => {
+      if (m.model !== modelToUse) return false;
+      if (runToUse) {
+        const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+        const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+        const rKey = d && c ? `${d}_${c}` : "";
+        if (rKey && rKey !== runToUse) return false;
+      }
+      return true;
+    });
+
+    const seen = new Set();
+    const unique = [];
+    filtered.forEach((m) => {
+      const key = m.atcf_id || m.storm_id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(m);
+      }
+    });
+
+    return unique.sort((a, b) => {
+      const labelA = formatStormDisplayName(a.atcf_id || a.storm_id);
+      const labelB = formatStormDisplayName(b.atcf_id || b.storm_id);
+      return labelA.localeCompare(labelB);
+    });
+  }, [clusterManifest, lightboxData?.isStorm, lightboxData?.item, activeStormModel, activeStormRunKey]);
+
+  const openStormLightbox = (item) => {
+    if (!item) return;
+    const modelToUse = item.model || activeStormModel;
+    const itemDate = item.init_date || (item.unique_key?.match(/(\d{8})T/)?.[1] || "");
+    const itemCycle = item.cycle || (item.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+    const runToUse = itemDate && itemCycle ? `${itemDate}_${itemCycle}` : activeStormRunKey;
+
+    const stormItems = clusterManifest.filter(
+      (m) => !m.is_monitoring && !m.storm_id?.startsWith("MONITORING_")
+    );
+
+    const list = stormItems
+      .filter((m) => {
+        if (m.model !== modelToUse) return false;
+        if (runToUse) {
+          const d = m.init_date || (m.unique_key?.match(/(\d{8})T/)?.[1] || "");
+          const c = m.cycle || (m.unique_key?.includes("T06Z") ? "06Z" : "00Z");
+          const rKey = d && c ? `${d}_${c}` : "";
+          if (rKey && rKey !== runToUse) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const labelA = formatStormDisplayName(a.atcf_id || a.storm_id);
+        const labelB = formatStormDisplayName(b.atcf_id || b.storm_id);
+        return labelA.localeCompare(labelB);
+      });
+
+    const stormId = item.atcf_id || item.storm_id;
+    const foundIdx = list.findIndex((m) => (m.atcf_id || m.storm_id) === stormId);
+
+    const src = getAssetUrl(`/assets/${item.filename}`);
+    const title = `${formatStormDisplayName(stormId)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`;
+    scaleRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    setDisplayScale(1);
+    setLightboxIndex(foundIdx !== -1 ? foundIdx : 0);
+    setLightboxData({
+      src,
+      title,
+      isStorm: true,
+      item
+    });
+  };
+
   const handlePrevLightbox = useCallback((e) => {
     if (e && e.stopPropagation) e.stopPropagation();
     const currentData = lightboxDataRef.current;
@@ -878,6 +1342,21 @@ const Forecast = () => {
       });
       return;
     }
+    if (currentData?.isStorm && activeLightboxStormList.length > 0) {
+      setLightboxIndex((prevIdx) => {
+        const cur = prevIdx ?? 0;
+        const prevIdxVal = (cur - 1 + activeLightboxStormList.length) % activeLightboxStormList.length;
+        const prevItem = activeLightboxStormList[prevIdxVal];
+        setLightboxData({
+          src: getAssetUrl(`/assets/${prevItem.filename}`),
+          title: `${formatStormDisplayName(prevItem.atcf_id || prevItem.storm_id)} • ${prevItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${prevItem.cycle || "00Z"})`,
+          isStorm: true,
+          item: prevItem
+        });
+        return prevIdxVal;
+      });
+      return;
+    }
     if (availableGridItems.length > 0) {
       setLightboxIndex((prevIdx) => {
         const cur = prevIdx ?? 0;
@@ -890,7 +1369,7 @@ const Forecast = () => {
         return prevIdxVal;
       });
     }
-  }, [activeLightboxClusterList, availableGridItems, selectedType]);
+  }, [activeLightboxClusterList, activeLightboxStormList, availableGridItems, selectedType]);
 
   const handleNextLightbox = useCallback((e) => {
     if (e && e.stopPropagation) e.stopPropagation();
@@ -910,6 +1389,21 @@ const Forecast = () => {
       });
       return;
     }
+    if (currentData?.isStorm && activeLightboxStormList.length > 0) {
+      setLightboxIndex((prevIdx) => {
+        const cur = prevIdx ?? 0;
+        const nextIdxVal = (cur + 1) % activeLightboxStormList.length;
+        const nextItem = activeLightboxStormList[nextIdxVal];
+        setLightboxData({
+          src: getAssetUrl(`/assets/${nextItem.filename}`),
+          title: `${formatStormDisplayName(nextItem.atcf_id || nextItem.storm_id)} • ${nextItem.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${nextItem.cycle || "00Z"})`,
+          isStorm: true,
+          item: nextItem
+        });
+        return nextIdxVal;
+      });
+      return;
+    }
     if (availableGridItems.length > 0) {
       setLightboxIndex((prevIdx) => {
         const cur = prevIdx ?? 0;
@@ -922,7 +1416,7 @@ const Forecast = () => {
         return nextIdxVal;
       });
     }
-  }, [activeLightboxClusterList, availableGridItems, selectedType]);
+  }, [activeLightboxClusterList, activeLightboxStormList, availableGridItems, selectedType]);
 
   const openLightboxWithImage = (src, title, modelId) => {
     let idx = -1;
@@ -1129,6 +1623,13 @@ const Forecast = () => {
         return;
       }
 
+      // Quick toggle for Active Storm horizon: 's' toggles storm mode
+      if (keyLower === "s") {
+        e.preventDefault();
+        setSelectedType((prev) => (prev === "storm" ? "5day" : "storm"));
+        return;
+      }
+
       // Toggle shortcuts cheatsheet
       if (e.key === "?") {
         e.preventDefault();
@@ -1166,6 +1667,37 @@ const Forecast = () => {
           setSelectedType("5day");
         }
       }
+
+      // In Active Storm Mode Specific Shortcuts
+      if (selectedType === "storm") {
+        if (keyLower === "m" || e.key === "Tab") {
+          e.preventDefault();
+          setActiveStormModel((prev) => (prev === "gdm_wnc_large" ? "gdm_wncv3" : "gdm_wnc_large"));
+        } else if (keyLower === "d") {
+          e.preventDefault();
+          setIsStormSplitView((prev) => !prev);
+        } else if (e.key === "ArrowLeft" || e.key === "[") {
+          e.preventDefault();
+          handlePrevStorm();
+        } else if (e.key === "ArrowRight" || e.key === "]") {
+          e.preventDefault();
+          handleNextStorm();
+        } else if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(e.key)) {
+          const numIdx = parseInt(e.key, 10) - 1;
+          if (availableActiveStormsList[numIdx]) {
+            e.preventDefault();
+            setSelectedEnsembleStormId(availableActiveStormsList[numIdx].id);
+          }
+        } else if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          if (activeStormItem) {
+            openStormLightbox(activeStormItem);
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setSelectedType("5day");
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -1183,7 +1715,14 @@ const Forecast = () => {
     activeClusterItem,
     clusterManifest,
     handleNextCluster,
-    handlePrevCluster
+    handlePrevCluster,
+    activeStormModel,
+    selectedEnsembleStormId,
+    availableActiveStormsList,
+    activeStormItem,
+    openStormLightbox,
+    handleNextStorm,
+    handlePrevStorm
   ]);
 
   const hasDataForCycle = (cycleTime) => {
@@ -1541,11 +2080,11 @@ const Forecast = () => {
                       key={model.id}
                       onClick={() => {
                         setSelectedModel(model.id);
-                        if (selectedType === "cluster") {
+                        if (selectedType === "cluster" || selectedType === "storm") {
                           setSelectedType("5day");
                         }
                       }}
-                      className={`toggle-btn ${selectedModel === model.id && selectedType !== "cluster" ? "active" : ""}`}
+                      className={`toggle-btn ${selectedModel === model.id && selectedType !== "cluster" && selectedType !== "storm" ? "active" : ""}`}
                     >
                       {model.name}
                     </button>
@@ -1553,7 +2092,7 @@ const Forecast = () => {
                 </div>
               )}
 
-              {/* Forecast Horizon (5-Day / 15-Day / Cluster Selector) */}
+              {/* Forecast Horizon (5-Day / 15-Day / Cluster / Active Storms Selector) */}
               <div className="horizon-selector">
                 <button
                   onClick={() => setSelectedType("5day")}
@@ -1577,13 +2116,23 @@ const Forecast = () => {
                   <span className="cluster-badge-count">{availableClusterList.length || "Live"}</span>
                   <kbd className="cluster-kbd-tag">C</kbd>
                 </button>
+                <button
+                  onClick={() => setSelectedType("storm")}
+                  className={`horizon-btn horizon-storm-btn ${selectedType === "storm" ? "active" : ""}`}
+                  title="Active Tropical Cyclones & Invest Track Ensembles (plot_ensemble) (Press 'S')"
+                >
+                  <span className="storm-radar-pulse" />
+                  <span>TC</span>
+                  <span className="storm-badge-count">{availableActiveStormsList.length || "Live"}</span>
+                  <kbd className="cluster-kbd-tag">S</kbd>
+                </button>
               </div>
 
             </div>
           </header>
 
-          {/* Timeline Run Selector Carousel (Hidden in Cluster tracking mode) */}
-          {selectedType !== "cluster" && (
+          {/* Timeline Run Selector Carousel (Hidden in Cluster & Storm tracking mode) */}
+          {selectedType !== "cluster" && selectedType !== "storm" && (
             <div className="timeline-carousel-container">
               <div className="timeline-carousel-header">
                 <span>Model Run Cycles Timeline</span>
@@ -1731,7 +2280,7 @@ const Forecast = () => {
           )}
 
           {/* Dashboard Panels */}
-          <div className={`forecast-grid ${isCompareGrid && selectedType !== "cluster" ? "compare-active" : ""}`}>
+          <div className={`forecast-grid ${isCompareGrid && selectedType !== "cluster" && selectedType !== "storm" ? "compare-active" : ""}`}>
 
             {/* Cluster Under-Monitoring Showcase Mode */}
             {selectedType === "cluster" ? (
@@ -1962,6 +2511,235 @@ const Forecast = () => {
                   </div>
                 )}
               </div>
+            ) : selectedType === "storm" ? (
+              <div className="panel cluster-panel storm-panel">
+                {/* Active Storm Toolbar */}
+                <div className="cluster-toolbar storm-toolbar">
+                  <div className="cluster-title-group">
+                    <div className="cluster-status-pill storm-status-pill">
+                      <span className="cluster-status-dot storm-status-dot" />
+                      <span>ACTIVE TROPICAL CYCLONE ENSEMBLE</span>
+                    </div>
+                    <h3 className="cluster-main-title">
+                      {isStormSplitView
+                        ? `Dual Model Comparison • ${formatStormDisplayName(selectedEnsembleStormId)}`
+                        : `${formatStormDisplayName(activeStormItem?.atcf_id || activeStormItem?.storm_id || selectedEnsembleStormId)}`}
+                    </h3>
+                    <span className="cluster-subtitle">
+                      High-Resolution GDM Ensemble Spaghetti & Philippine Landfall Probability
+                    </span>
+                  </div>
+
+                  <div className="cluster-actions-group">
+                    {/* Cycle Segmented Control */}
+                    {availableStormRuns.length > 0 && (
+                      <div className="cluster-cycle-segmented storm-cycle-segmented">
+                        <span className="cycle-seg-label">Cycle:</span>
+                        {availableStormRuns.map((run) => (
+                          <button
+                            key={run.key}
+                            onClick={() => setSelectedStormRun(run.key)}
+                            className={`cluster-cycle-btn ${activeStormRunKey === run.key ? "active" : ""}`}
+                            title={`Run Initialization: ${run.dateLabel} ${run.cycle}`}
+                          >
+                            {run.displayLabel}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Model Segmented Control (Active in Single View) */}
+                    {!isStormSplitView && (
+                      <div className="cluster-model-segmented">
+                        {CLUSTER_MODELS.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => setActiveStormModel(m.id)}
+                            className={`cluster-seg-btn ${activeStormModel === m.id ? "active" : ""}`}
+                            title={`Switch to ${m.name} (Key: M)`}
+                          >
+                            <span className="seg-name-full">{m.name}</span>
+                            <span className="seg-name-short">{m.shortName}</span>
+                            <span className="seg-badge">{m.badge}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Secondary Actions (Side-by-side & Help) */}
+                    <div className="cluster-secondary-actions">
+                      <button
+                        onClick={() => setIsStormSplitView((prev) => !prev)}
+                        className={`cluster-tool-btn cluster-split-toggle-btn ${isStormSplitView ? "active" : ""}`}
+                        title="Toggle Dual Side-by-Side View (Key: D)"
+                      >
+                        <Columns2 size={14} />
+                        <span>{isStormSplitView ? "Single View" : "Side-by-Side"}</span>
+                        <kbd className="kbd-mini">D</kbd>
+                      </button>
+
+                      <button
+                        onClick={() => setShowClusterHelp(true)}
+                        className="cluster-tool-btn cluster-tool-icon-only"
+                        title="Keyboard Shortcuts & Gestures (Key: ?)"
+                      >
+                        <HelpCircle size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Storm Selector Chips */}
+                {availableActiveStormsList.length > 0 && (
+                  <div className="cluster-lpa-strip storm-strip">
+                    <div className="cluster-strip-label storm-strip-label">
+                      <Activity size={13} />
+                      <span>Active:</span>
+                    </div>
+                    <div className="cluster-chips-scroll">
+                      {availableActiveStormsList.map((s, idx) => {
+                        const isSelected = selectedEnsembleStormId === s.id;
+                        const hasInCurrentModel = s.models.includes(activeStormModel);
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => {
+                              setSelectedEnsembleStormId(s.id);
+                              if (!hasInCurrentModel && s.models.length > 0) {
+                                setActiveStormModel(s.models[0]);
+                              }
+                            }}
+                            className={`cluster-lpa-chip storm-chip ${isSelected ? "active" : ""}`}
+                            title={`View ${s.label} (Key: ${idx + 1})`}
+                          >
+                            <span className="chip-indicator storm-chip-indicator" />
+                            <span className="chip-name">{s.label}</span>
+                            <span className="storm-chip-cat">{s.category}</span>
+                            <kbd className="chip-kbd">{idx + 1}</kbd>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Main Visual Display Area */}
+                {isStormSplitView ? (
+                  /* Dual Side-by-Side View */
+                  <div className="cluster-split-container">
+                    {/* WNCv3 Card */}
+                    <div className="cluster-split-card">
+                      <div className="cluster-split-header">
+                        <div className="split-model-tag v3-tag">GDM WNCv3</div>
+                        <span className="split-storm-tag">{formatStormDisplayName(splitStormV3Item?.atcf_id || selectedEnsembleStormId)}</span>
+                        <span className="split-members-tag">64 Members</span>
+                      </div>
+                      <div
+                        className="cluster-image-wrapper split-image-wrap"
+                        onClick={() => splitStormV3Item && openStormLightbox(splitStormV3Item)}
+                      >
+                        {splitStormV3Item ? (
+                          <img
+                            src={getAssetUrl(`/assets/${splitStormV3Item.filename}`)}
+                            alt="GDM WNCv3 Storm Ensemble Plot"
+                            className="cluster-img"
+                          />
+                        ) : (
+                          <div className="empty-state">
+                            <span>No WNCv3 ensemble plot available for {formatStormDisplayName(selectedEnsembleStormId)}.</span>
+                          </div>
+                        )}
+                        <div className="cluster-hover-hint">
+                          <Maximize2 size={16} />
+                          <span>Click to Expand Lightbox</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* WNC Large Card */}
+                    <div className="cluster-split-card">
+                      <div className="cluster-split-header">
+                        <div className="split-model-tag large-tag">GDM WNC Large</div>
+                        <span className="split-storm-tag">{formatStormDisplayName(splitStormLargeItem?.atcf_id || selectedEnsembleStormId)}</span>
+                        <span className="split-members-tag">1,000 Members</span>
+                      </div>
+                      <div
+                        className="cluster-image-wrapper split-image-wrap"
+                        onClick={() => splitStormLargeItem && openStormLightbox(splitStormLargeItem)}
+                      >
+                        {splitStormLargeItem ? (
+                          <img
+                            src={getAssetUrl(`/assets/${splitStormLargeItem.filename}`)}
+                            alt="GDM WNC Large Storm Ensemble Plot"
+                            className="cluster-img"
+                          />
+                        ) : (
+                          <div className="empty-state">
+                            <span>No WNC Large ensemble plot available for {formatStormDisplayName(selectedEnsembleStormId)}.</span>
+                          </div>
+                        )}
+                        <div className="cluster-hover-hint">
+                          <Maximize2 size={16} />
+                          <span>Click to Expand Lightbox</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Single Active Model Card with Mobile Swipe */
+                  <div
+                    className="cluster-single-card"
+                    onTouchStart={handleStormTouchStart}
+                    onTouchEnd={handleStormTouchEnd}
+                  >
+                    <div
+                      className="cluster-image-wrapper"
+                      onClick={() => activeStormItem && openStormLightbox(activeStormItem)}
+                    >
+                      {activeStormItem ? (
+                        <img
+                          src={getAssetUrl(`/assets/${activeStormItem.filename}`)}
+                          alt={`Ensemble spaghetti plot for ${formatStormDisplayName(activeStormItem.atcf_id || activeStormItem.storm_id)}`}
+                          className="cluster-img"
+                        />
+                      ) : (
+                        <div className="empty-state">
+                          <span>No storm ensemble graphic available for this selection.</span>
+                        </div>
+                      )}
+                      <div className="cluster-hover-hint">
+                        <Maximize2 size={16} />
+                        <span>Click to Zoom & Pan (or Press Space)</span>
+                      </div>
+                    </div>
+
+                    {/* Mobile Swipe Guidance and Quick Stepper */}
+                    <div className="cluster-mobile-bar">
+                      <button
+                        onClick={handlePrevStorm}
+                        className="mobile-stepper-btn"
+                        disabled={availableActiveStormsList.length <= 1}
+                      >
+                        <ChevronLeft size={16} />
+                        <span>Prev</span>
+                      </button>
+
+                      <div className="mobile-swipe-indicator">
+                        <span>{formatStormDisplayName(selectedEnsembleStormId)} • Swipe image or tap buttons</span>
+                      </div>
+
+                      <button
+                        onClick={handleNextStorm}
+                        className="mobile-stepper-btn"
+                        disabled={availableActiveStormsList.length <= 1}
+                      >
+                        <span>Next</span>
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : isCompareGrid ? (
               /* Comparison Grid mode view */
               <div className="comparison-grid">
@@ -2031,8 +2809,8 @@ const Forecast = () => {
             )}
 
             {/* Sidebar / Metadata Controls */}
-            <aside className="panel metadata-panel" style={isCompareGrid && selectedType !== "cluster" ? { width: "100%", gridColumn: "1 / -1" } : {}}>
-              {/* Conditional Cluster Meta or Standard Run Details */}
+            <aside className="panel metadata-panel" style={isCompareGrid && selectedType !== "cluster" && selectedType !== "storm" ? { width: "100%", gridColumn: "1 / -1" } : {}}>
+              {/* Conditional Cluster Meta, Active Storm Meta, or Standard Run Details */}
               {selectedType === "cluster" ? (
                 <div className="metadata-section">
                   <div className="cluster-meta-header">
@@ -2072,6 +2850,51 @@ const Forecast = () => {
                   <div className="cluster-shortcuts-hint-box" onClick={() => setShowClusterHelp(true)}>
                     <Command size={13} />
                     <span>Shortcuts: <kbd>C</kbd> Horizon, <kbd>M</kbd> Model, <kbd>1-4</kbd> Cluster, <kbd>Space</kbd> Zoom</span>
+                  </div>
+                </div>
+              ) : selectedType === "storm" ? (
+                <div className="metadata-section">
+                  <div className="cluster-meta-header storm-meta-header">
+                    <span className="cluster-live-tag storm-live-tag">ACTIVE STORM ENSEMBLE</span>
+                  </div>
+                  <h2>Storm Forecast Intelligence</h2>
+                  <dl className="details-list">
+                    <div className="detail-item">
+                      <dt>System Target</dt>
+                      <dd className="highlight-text" style={{ color: "#f43f5e" }}>
+                        {formatStormDisplayName(activeStormItem?.atcf_id || activeStormItem?.storm_id || selectedEnsembleStormId)}
+                      </dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>ATCF Reference</dt>
+                      <dd className="mono-value">
+                        {activeStormItem?.atcf_id || selectedEnsembleStormId} ({activeStormItem?.storm_id || "Active"})
+                      </dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Model System</dt>
+                      <dd className="mono-value">
+                        {activeStormModel === "gdm_wnc_large" ? "GDM WNC Large (1,000 Members)" : "GDM WNCv3 (64 Members)"}
+                      </dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Initialization Cycle</dt>
+                      <dd className="mono-value">
+                        {activeStormItem ? `${activeStormItem.init_date} ${activeStormItem.cycle}` : "Latest 06Z"}
+                      </dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Landfall</dt>
+                      <dd style={{ color: "#38bdf8", fontWeight: 700 }}>Philippine Scenario landfall</dd>
+                    </div>
+                    <div className="detail-item">
+                      <dt>Status</dt>
+                      <dd style={{ color: "#10b981", fontWeight: 700 }}>Operational Ensemble Products</dd>
+                    </div>
+                  </dl>
+                  <div className="cluster-shortcuts-hint-box storm-shortcuts-hint-box" onClick={() => setShowClusterHelp(true)}>
+                    <Command size={13} />
+                    <span>Shortcuts: <kbd>S</kbd> Horizon, <kbd>M</kbd> Model, <kbd>1-9</kbd> Storm, <kbd>Space</kbd> Zoom</span>
                   </div>
                 </div>
               ) : (
@@ -2181,7 +3004,7 @@ const Forecast = () => {
                       ? availableGridItems[lightboxIndex].model.name.toUpperCase()
                       : lightboxData.title}
                 </span>
-                <span className="lightbox-brand-badge">{lightboxData?.isCluster ? "CLUSTER" : "MAINLINE"}</span>
+                <span className="lightbox-brand-badge">{lightboxData?.isCluster ? "CLUSTER" : lightboxData?.isStorm ? "ACTIVE STORM" : "MAINLINE"}</span>
               </div>
 
               {lightboxData?.isCluster ? (
@@ -2205,6 +3028,32 @@ const Forecast = () => {
                           }}
                         >
                           {formatClusterLabel(clusterId)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              ) : lightboxData?.isStorm ? (
+                activeLightboxStormList.length > 1 && (
+                  <div className="lightbox-model-tabs-center">
+                    {activeLightboxStormList.map((item, idx) => {
+                      const stormId = item.atcf_id || item.storm_id;
+                      const isActive = (lightboxData.item?.atcf_id || lightboxData.item?.storm_id) === stormId;
+                      return (
+                        <button
+                          key={stormId}
+                          className={`lightbox-tab-pill storm-tab-pill ${isActive ? "active" : ""}`}
+                          onClick={() => {
+                            setLightboxIndex(idx);
+                            setLightboxData({
+                              src: getAssetUrl(`/assets/${item.filename}`),
+                              title: `${formatStormDisplayName(stormId)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                              isStorm: true,
+                              item
+                            });
+                          }}
+                        >
+                          {formatStormDisplayName(stormId)}
                         </button>
                       );
                     })}
@@ -2264,50 +3113,69 @@ const Forecast = () => {
             </div>
 
             {/* Bottom Stepper Pill Bar: < Prev • Dots • Next > */}
-            {(lightboxData?.isCluster ? activeLightboxClusterList.length > 1 : availableGridItems.length > 1) && (
-              <div className="lightbox-bottom-stepper" onClick={(e) => e.stopPropagation()}>
-                <button className="stepper-btn" onClick={handlePrevLightbox} aria-label="Previous">
-                  <ChevronLeft size={16} />
-                  <span>Prev</span>
-                </button>
+            {(lightboxData?.isCluster
+              ? activeLightboxClusterList.length > 1
+              : lightboxData?.isStorm
+                ? activeLightboxStormList.length > 1
+                : availableGridItems.length > 1) && (
+                <div className="lightbox-bottom-stepper" onClick={(e) => e.stopPropagation()}>
+                  <button className="stepper-btn" onClick={handlePrevLightbox} aria-label="Previous">
+                    <ChevronLeft size={16} />
+                    <span>Prev</span>
+                  </button>
 
-                <div className="stepper-dots">
-                  {(lightboxData?.isCluster ? activeLightboxClusterList : availableGridItems).map((item, idx) => {
-                    const isActive = lightboxData?.isCluster
-                      ? (lightboxData.item?.atcf_id || lightboxData.item?.storm_id) === (item.atcf_id || item.storm_id)
-                      : idx === lightboxIndex;
-                    return (
-                      <span
-                        key={idx}
-                        className={`stepper-dot ${isActive ? "active" : ""}`}
-                        onClick={() => {
-                          if (lightboxData?.isCluster) {
-                            setLightboxIndex(idx);
-                            setLightboxData({
-                              src: getAssetUrl(`/assets/${item.filename}`),
-                              title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
-                              isCluster: true,
-                              item
-                            });
-                          } else {
-                            setLightboxIndex(idx);
-                            setLightboxData({
-                              src: item.track.imageSrc,
-                              title: `${item.model.name} (${selectedType.toUpperCase()})`
-                            });
-                          }
-                        }}
-                      />
-                    );
-                  })}
+                  <div className="stepper-dots">
+                    {(lightboxData?.isCluster
+                      ? activeLightboxClusterList
+                      : lightboxData?.isStorm
+                        ? activeLightboxStormList
+                        : availableGridItems
+                    ).map((item, idx) => {
+                      const isActive = lightboxData?.isCluster
+                        ? (lightboxData.item?.atcf_id || lightboxData.item?.storm_id) === (item.atcf_id || item.storm_id)
+                        : lightboxData?.isStorm
+                          ? (lightboxData.item?.atcf_id || lightboxData.item?.storm_id) === (item.atcf_id || item.storm_id)
+                          : idx === lightboxIndex;
+                      return (
+                        <span
+                          key={idx}
+                          className={`stepper-dot ${isActive ? "active" : ""}`}
+                          onClick={() => {
+                            if (lightboxData?.isCluster) {
+                              setLightboxIndex(idx);
+                              setLightboxData({
+                                src: getAssetUrl(`/assets/${item.filename}`),
+                                title: `${formatClusterLabel(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                                isCluster: true,
+                                item
+                              });
+                            } else if (lightboxData?.isStorm) {
+                              setLightboxIndex(idx);
+                              setLightboxData({
+                                src: getAssetUrl(`/assets/${item.filename}`),
+                                title: `${formatStormDisplayName(item.atcf_id || item.storm_id)} • ${item.model === "gdm_wnc_large" ? "GDM WNC Large" : "GDM WNCv3"} (${item.cycle || "00Z"})`,
+                                isStorm: true,
+                                item
+                              });
+                            } else {
+                              setLightboxIndex(idx);
+                              setLightboxData({
+                                src: item.track.imageSrc,
+                                title: `${item.model.name} (${selectedType.toUpperCase()})`
+                              });
+                            }
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <button className="stepper-btn" onClick={handleNextLightbox} aria-label="Next">
+                    <span>Next</span>
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
-
-                <button className="stepper-btn" onClick={handleNextLightbox} aria-label="Next">
-                  <span>Next</span>
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
+              )}
           </div>
         )}
 
@@ -2318,7 +3186,7 @@ const Forecast = () => {
               <div className="help-dialog-header">
                 <div className="help-title-wrap">
                   <Command size={18} />
-                  <h4>Cluster Monitoring Shortcuts</h4>
+                  <h4>Ensemble & Cluster Monitoring Shortcuts</h4>
                 </div>
                 <button className="help-close-btn" onClick={() => setShowClusterHelp(false)}>
                   <X size={16} />
@@ -2330,6 +3198,10 @@ const Forecast = () => {
                   <kbd className="shortcut-key">C</kbd>
                 </div>
                 <div className="shortcut-row">
+                  <span className="shortcut-desc">Toggle Active Storms view</span>
+                  <kbd className="shortcut-key">S</kbd>
+                </div>
+                <div className="shortcut-row">
                   <span className="shortcut-desc">Toggle Model (WNCv3 ↔ Large)</span>
                   <kbd className="shortcut-key">M</kbd>
                 </div>
@@ -2338,19 +3210,19 @@ const Forecast = () => {
                   <kbd className="shortcut-key">D</kbd>
                 </div>
                 <div className="shortcut-row">
-                  <span className="shortcut-desc">Next / Previous Cluster</span>
+                  <span className="shortcut-desc">Next / Previous Storm or Cluster</span>
                   <div className="shortcut-keys-group">
                     <kbd className="shortcut-key">←</kbd>
                     <kbd className="shortcut-key">→</kbd>
                   </div>
                 </div>
                 <div className="shortcut-row">
-                  <span className="shortcut-desc">Direct jump to Cluster 1 – 4</span>
+                  <span className="shortcut-desc">Direct jump to Storm/Cluster 1 – 9</span>
                   <div className="shortcut-keys-group">
                     <kbd className="shortcut-key">1</kbd>
                     <kbd className="shortcut-key">2</kbd>
                     <kbd className="shortcut-key">3</kbd>
-                    <kbd className="shortcut-key">4</kbd>
+                    <kbd className="shortcut-key">...</kbd>
                   </div>
                 </div>
                 <div className="shortcut-row">
@@ -2365,12 +3237,12 @@ const Forecast = () => {
                   </div>
                 </div>
                 <div className="shortcut-row">
-                  <span className="shortcut-desc">Close Lightbox / Exit Cluster View</span>
+                  <span className="shortcut-desc">Close Lightbox / Exit Special View</span>
                   <kbd className="shortcut-key">Esc</kbd>
                 </div>
               </div>
               <div className="help-dialog-footer">
-                <span>📱 Touch gestures: Swipe left/right on mobile image to switch clusters</span>
+                <span>📱 Touch gestures: Swipe left/right on mobile image to switch storms / clusters</span>
               </div>
             </div>
           </div>
