@@ -245,6 +245,11 @@ def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
     and category distribution across ensemble members and control track.
     All location and offshore percentages share the common effective_total denominator.
     """
+    if total_members in (63, 64):
+        total_members = 64
+    elif total_members in (999, 1000):
+        total_members = 1000
+
     tree, geoms, props = get_ph_municipalities_tree()
     if tree is None:
         return {
@@ -272,6 +277,10 @@ def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
 
     n_hits = len(landfalls)
     effective_total = max(total_members, len(track_dfs), 1)
+    if effective_total in (63, 64):
+        effective_total = 64
+    elif effective_total in (999, 1000):
+        effective_total = 1000
 
     if n_hits == 0 and ctrl_hit is None:
         return {
@@ -1056,6 +1065,10 @@ def cluster_genesis_locations(df, dist_threshold=6.0):
                     
         # Compute min_cluster_size (same formula as generate_trends_map.py)
         num_members = len(init_df['sample'].unique())
+        if num_members in (63, 64):
+            num_members = 64
+        elif num_members in (999, 1000):
+            num_members = 1000
         min_cluster_size = max(4, int(round(num_members * (0.03 if num_members > 100 else 0.08))))
         min_cluster_size = min(n_tracks, max(2, min_cluster_size))
         
@@ -1501,7 +1514,14 @@ def plot_model_tracks(
                                 'pressure': row['pressure']
                             })
 
-            model_total_members = df_model[df_model['sample'] > 0]['sample'].nunique()
+            raw_model_members = df_model['sample'].nunique() if 'sample' in df_model.columns else 0
+            pos_model_members = df_model[df_model['sample'] > 0]['sample'].nunique() if 'sample' in df_model.columns else 0
+            if raw_model_members in (63, 64) or pos_model_members in (63, 64):
+                model_total_members = 64
+            elif raw_model_members in (999, 1000) or pos_model_members in (999, 1000):
+                model_total_members = 1000
+            else:
+                model_total_members = pos_model_members if pos_model_members > 0 else raw_model_members
             effective_total = min(100, model_total_members) if model_total_members > 0 else 1
             required_support = max(1, effective_total // 2)
 
@@ -1569,8 +1589,16 @@ def plot_model_tracks(
         deduped_track_dfs = [df_mean]
 
     plotted_members = len(deduped_track_dfs)
-    if total_ensemble_members is None or total_ensemble_members < plotted_members:
+    if total_ensemble_members in (63, 64):
+        total_ensemble_members = 64
+    elif total_ensemble_members in (999, 1000):
+        total_ensemble_members = 1000
+    elif total_ensemble_members is None or total_ensemble_members < plotted_members:
         total_ensemble_members = max(plotted_members, 51)
+        if total_ensemble_members in (63, 64):
+            total_ensemble_members = 64
+        elif total_ensemble_members in (999, 1000):
+            total_ensemble_members = 1000
 
     # Determine if live ATCF point should connect to track
     first_track_lat, first_track_lon = None, None
@@ -2639,9 +2667,16 @@ def main():
             continue
 
         normalized_df = normalize_dataframe(raw_df)
-        total_members = normalized_df[normalized_df['sample'] > 0]['sample'].nunique()
-        if total_members == 0:
-            total_members = normalized_df['sample'].nunique()
+        raw_members = normalized_df['sample'].nunique() if 'sample' in normalized_df.columns else 0
+        pos_members = normalized_df[normalized_df['sample'] > 0]['sample'].nunique() if 'sample' in normalized_df.columns else 0
+        if raw_members in (63, 64) or pos_members in (63, 64):
+            total_members = 64
+        elif raw_members in (999, 1000) or pos_members in (999, 1000):
+            total_members = 1000
+        else:
+            total_members = pos_members if pos_members > 0 else raw_members
+            if total_members == 0:
+                total_members = 1
         wp_df = filter_western_pacific(normalized_df)
         
         if wp_df.empty:

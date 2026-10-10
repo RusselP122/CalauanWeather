@@ -1110,7 +1110,11 @@ def plot_monitoring_tracks(
     if cluster_members == 0:
         return
 
-    if total_ensemble_members is None or total_ensemble_members <= 0:
+    if total_ensemble_members in (63, 64):
+        total_ensemble_members = 64
+    elif total_ensemble_members in (999, 1000):
+        total_ensemble_members = 1000
+    elif total_ensemble_members is None or total_ensemble_members <= 0:
         total_ensemble_members = max(cluster_members, 50)
 
     # Init time
@@ -1951,7 +1955,16 @@ def main():
                 pass
 
         model = detect_model_name(f_path)
-        total_members = wp_df['sample'].nunique()
+        raw_m = wp_df['sample'].nunique() if 'sample' in wp_df.columns else 0
+        pos_m = wp_df[wp_df['sample'] > 0]['sample'].nunique() if 'sample' in wp_df.columns else 0
+        if raw_m in (63, 64) or pos_m in (63, 64):
+            total_members = 64
+        elif raw_m in (999, 1000) or pos_m in (999, 1000):
+            total_members = 1000
+        else:
+            total_members = pos_m if pos_m > 0 else raw_m
+            if total_members == 0:
+                total_members = 1
 
         eff_min_members = max(args.min_members, int(total_members * 0.015)) if total_members >= 500 else args.min_members
         eff_min_mean_members = max(args.min_mean_members, int(total_members * 0.05)) if total_members >= 500 else args.min_mean_members
