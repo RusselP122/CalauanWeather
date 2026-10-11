@@ -1482,18 +1482,26 @@ def plot_monitoring_tracks(
     track_cmap = mcolors.ListedColormap(wind_colors)
     track_norm = mcolors.BoundaryNorm(wind_bounds, track_cmap.N, extend='both')
 
-    # Dynamic track styling based on ensemble size / model
+    # Detect if member tracks cross or densely cluster over the Philippines
+    ph_tracks_count = 0
+    for m_df in deduped_track_dfs:
+        in_ph = ((m_df['lat'] >= 4.5) & (m_df['lat'] <= 22.0) & (m_df['lon'] >= 115.0) & (m_df['lon'] <= 130.0)).any()
+        if in_ph:
+            ph_tracks_count += 1
     is_large = (total_ensemble_members is not None and total_ensemble_members >= 200) or ('large' in model_name.lower())
+    is_dense_over_ph = ph_tracks_count >= 15 or (is_large and ph_tracks_count >= 5)
+
+    # Dynamic track styling based on ensemble size / model and regional density
     if is_large:
-        track_lw = 0.95
-        track_alpha = 0.40
-        halo_alpha = 0.10
-        halo_lw = 2.0
+        track_lw = 0.85 if is_dense_over_ph else 0.95
+        track_alpha = 0.32 if is_dense_over_ph else 0.40
+        halo_alpha = 0.08
+        halo_lw = 1.8
     else:
-        track_lw = 1.2
-        track_alpha = 0.85
-        halo_alpha = 0.30
-        halo_lw = 2.8
+        track_lw = 1.1 if is_dense_over_ph else 1.3
+        track_alpha = 0.70 if is_dense_over_ph else 0.85
+        halo_alpha = 0.20 if is_dense_over_ph else 0.30
+        halo_lw = 2.4 if is_dense_over_ph else 2.8
 
     for member_df in deduped_track_dfs:
         member_df = member_df.sort_values('lead_time_hours')
@@ -1532,6 +1540,19 @@ def plot_monitoring_tracks(
         )
         lc.set_array(np.array(seg_winds))
         ax_map.add_collection(lc)
+
+    # High-visibility Muted Slate & Silver Philippine Province & Border Overlay
+    if prov_geoms and is_dense_over_ph:
+        # 1. Subtle dark halo behind province boundaries for contrast against light track segments
+        ax_map.add_geometries(
+            prov_geoms, crs=ccrs.PlateCarree(), facecolor='none',
+            edgecolor='#090d14', linewidth=1.3, alpha=0.75, zorder=6.4
+        )
+        # 2. Muted Slate & Silver province lines (#94a3b8)
+        ax_map.add_geometries(
+            prov_geoms, crs=ccrs.PlateCarree(), facecolor='none',
+            edgecolor='#94a3b8', linewidth=0.55, alpha=0.85, zorder=6.5
+        )
 
     for spine in ax_map.spines.values():
         spine.set_edgecolor('#334155')

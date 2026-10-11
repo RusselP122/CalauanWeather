@@ -1177,31 +1177,86 @@ def haversine_km(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-def find_control_track_for_storm(df_storm, df_model, model_name, storm_name, atcf_pos=None, color_by='pressure'):
+def find_control_track_for_storm(df_storm, df_model, model_name, storm_name, atcf_pos=None, color_by='pressure', df_paired=None):
     """
-    Identifies the official deterministic control track for the storm cluster:
-    1. For ECMWF (IFS/AIFS):
-       - Checks explicit flags: 'is_control' == True or 'forecast_type' == 0.
-       - Checks AIFS convention: sample == 52 (fallback to 51).
-       - Checks IFS convention: sample == 51.
-       - Checks standard control: sample == 0 or sample == -1.
-    2. For other models: checks sample == 0 or sample == -1.
-    First looks within df_storm (the clustered disturbance).
-    If not found in df_storm, looks within the full df_model within 600 km of storm reference position.
+    Identifies the official control track for the storm cluster:
+    1. For GDM models (WNC, WNCv3, FNV3, Large, Oper):
+       STRICTLY PAIRED ONLY: Must come from df_paired (sample == -1).
+       If not present in df_paired, has_control is strictly False (no fallback to sample == 0).
+    2. For ECMWF models (IFS, AIFS):
+       Checks ECMWF deterministic control flags (sample == 51/52, forecast_type == 0, is_control == True).
     Returns (control_df, control_indices, has_control) where control_df has columns [lead_time_hours, lat, lon, pressure, wind].
     """
+    ref_lat, ref_lon = (atcf_pos[0], atcf_pos[1]) if atcf_pos else (None, None)
+    if ref_lat is None:
+        first_valid = df_storm.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
+        if not first_valid.empty:
+            ref_lat, ref_lon = first_valid.iloc[0]['lat'], first_valid.iloc[0]['lon']
+
+    is_gdm = any(k in model_name.lower() for k in ['wnv3', 'wnc', 'fnv3', 'oper', 'large', 'gdm'])
+    if is_gdm:
+        # GDM models strictly require an official paired control track from df_paired (sample == -1)
+        if df_paired is None or df_paired.empty:
+            print(f"No paired dataset available for {storm_name} in {model_name}; using calculated ensemble mean.")
+            return pd.DataFrame(columns=['lead_time_hours', 'lat', 'lon', 'pressure', 'wind']), pd.Index([]), False
+
+        match_num = re.search(r'(\d{2})', str(storm_name))
+        storm_num = match_num.group(1) if match_num else None
+
+        paired_candidates = df_paired.copy()
+        if 'sample' in paired_candidates.columns:
+            p_sample = paired_candidates[paired_candidates['sample'] == -1]
+            if not p_sample.empty:
+                paired_candidates = p_sample
+
+        best_paired_track = None
+
+        # Try matching by storm numerical identifier first (e.g. WP27, 27W, WP95, 95W)
+        if storm_num:
+            for tid, t_df in paired_candidates.groupby('track_id'):
+                t_df = t_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
+                if len(t_df) < 2:
+                    continue
+                tid_str = str(tid).upper()
+                if f"WP{storm_num}" in tid_str or f"{storm_num}W" in tid_str or tid_str == storm_num:
+                    best_paired_track = t_df
+                    break
+        else:
+            best_paired_dist = float('inf')
+            if ref_lat is not None and ref_lon is not None:
+                for tid, t_df in paired_candidates.groupby('track_id'):
+                    t_df = t_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
+                    if len(t_df) < 2:
+                        continue
+                    t_early = t_df[t_df['lead_time_hours'] <= 48.0]
+                    if t_early.empty:
+                        t_early = t_df.head(1)
+                    dists = [haversine_km(r['lat'], r['lon'], ref_lat, ref_lon) for _, r in t_early.iterrows()]
+                    min_d = min(dists) if dists else float('inf')
+                    if min_d < 500.0 and min_d < best_paired_dist:
+                        best_paired_dist = min_d
+                        best_paired_track = t_df
+
+        if best_paired_track is not None and len(best_paired_track) >= 2:
+            cols = ['lead_time_hours', 'lat', 'lon', 'pressure', 'wind']
+            res_df = best_paired_track[cols].sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
+            tid_found = best_paired_track['track_id'].iloc[0]
+            print(f"Using official {model_name} paired control track '{tid_found}' ({len(res_df)} points) for {storm_name}")
+            return res_df, pd.Index([]), True
+        else:
+            # Control is strictly paired only: if not in paired dataset, no control track
+            print(f"No paired track found for {storm_name} in {model_name} paired dataset; using calculated ensemble mean.")
+            return pd.DataFrame(columns=['lead_time_hours', 'lat', 'lon', 'pressure', 'wind']), pd.Index([]), False
+
+    # 2. For non-paired models (e.g. ECMWF IFS/AIFS)
     is_ecmwf = any(k in model_name.lower() for k in ['ecmwf', 'ifs', 'aifs'])
-    ctrl_mask = pd.Series(False, index=df_storm.index)
-    if 'is_control' in df_storm.columns:
-        ctrl_mask = ctrl_mask | (df_storm['is_control'] == True)
-    if 'forecast_type' in df_storm.columns:
-        ctrl_mask = ctrl_mask | (df_storm['forecast_type'] == 0)
-    if 'sample' in df_storm.columns:
-        if (df_storm['sample'] == 0).any():
-            ctrl_mask = ctrl_mask | (df_storm['sample'] == 0)
-        if (df_storm['sample'] == -1).any():
-            ctrl_mask = ctrl_mask | (df_storm['sample'] == -1)
-        if is_ecmwf:
+    if is_ecmwf:
+        ctrl_mask = pd.Series(False, index=df_storm.index)
+        if 'is_control' in df_storm.columns:
+            ctrl_mask = ctrl_mask | (df_storm['is_control'] == True)
+        if 'forecast_type' in df_storm.columns:
+            ctrl_mask = ctrl_mask | (df_storm['forecast_type'] == 0)
+        if 'sample' in df_storm.columns:
             if 'aifs' in model_name.lower():
                 if (df_storm['sample'] == 52).any():
                     ctrl_mask = ctrl_mask | (df_storm['sample'] == 52)
@@ -1211,71 +1266,21 @@ def find_control_track_for_storm(df_storm, df_model, model_name, storm_name, atc
                 if (df_storm['sample'] == 51).any():
                     ctrl_mask = ctrl_mask | (df_storm['sample'] == 51)
                     
-    ctrl_candidates = df_storm[ctrl_mask].copy()
-    ref_lat, ref_lon = (atcf_pos[0], atcf_pos[1]) if atcf_pos else (None, None)
-    if ref_lat is None:
-        first_valid = df_storm.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-        if not first_valid.empty:
-            ref_lat, ref_lon = first_valid.iloc[0]['lat'], first_valid.iloc[0]['lon']
-
-    # If not found inside the clustered storm group, search the full model dataset
-    if ctrl_candidates.empty and df_model is not None and not df_model.empty and ref_lat is not None and ref_lon is not None:
-        m_mask = pd.Series(False, index=df_model.index)
-        if 'is_control' in df_model.columns:
-            m_mask = m_mask | (df_model['is_control'] == True)
-        if 'forecast_type' in df_model.columns:
-            m_mask = m_mask | (df_model['forecast_type'] == 0)
-        if 'sample' in df_model.columns:
-            if (df_model['sample'] == 0).any():
-                m_mask = m_mask | (df_model['sample'] == 0)
-            if (df_model['sample'] == -1).any():
-                m_mask = m_mask | (df_model['sample'] == -1)
-            if is_ecmwf:
-                if 'aifs' in model_name.lower():
-                    if (df_model['sample'] == 52).any():
-                        m_mask = m_mask | (df_model['sample'] == 52)
-                    elif (df_model['sample'] == 51).any() and not m_mask.any():
-                        m_mask = m_mask | (df_model['sample'] == 51)
-                elif 'ifs' in model_name.lower():
-                    if (df_model['sample'] == 51).any():
-                        m_mask = m_mask | (df_model['sample'] == 51)
-        m_candidates = df_model[m_mask].copy()
-        if not m_candidates.empty:
-            best_tid, best_d = None, 600.0
-            for tid, t_df in m_candidates.groupby('track_id'):
+        ctrl_candidates = df_storm[ctrl_mask].copy()
+        if not ctrl_candidates.empty:
+            best_ctrl, best_dist = None, float('inf')
+            for tid, t_df in ctrl_candidates.groupby('track_id'):
                 t_df = t_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
                 if len(t_df) < 2:
                     continue
-                t_early = t_df[t_df['lead_time_hours'] <= 48.0]
-                if t_early.empty:
-                    t_early = t_df.head(1)
-                dists = [haversine_km(r['lat'], r['lon'], ref_lat, ref_lon) for _, r in t_early.iterrows()]
+                dists = [haversine_km(r['lat'], r['lon'], ref_lat, ref_lon) for _, r in t_df.iterrows()]
                 min_d = min(dists) if dists else float('inf')
-                if min_d < best_d:
-                    best_d, best_tid = min_d, tid
-            if best_tid is not None:
-                ctrl_candidates = m_candidates[m_candidates['track_id'] == best_tid].copy()
-
-    if not ctrl_candidates.empty:
-        best_ctrl, best_dist = None, float('inf')
-        for tid, t_df in ctrl_candidates.groupby('track_id'):
-            t_df = t_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-            if len(t_df) < 2:
-                continue
-            if ref_lat is not None and ref_lon is not None:
-                t_early = t_df[t_df['lead_time_hours'] <= 48.0]
-                if t_early.empty:
-                    t_early = t_df.head(1)
-                dists = [haversine_km(r['lat'], r['lon'], ref_lat, ref_lon) for _, r in t_early.iterrows()]
-                min_d = min(dists) if dists else float('inf')
-            else:
-                min_d = 0.0
-            if min_d < best_dist:
-                best_dist, best_ctrl = min_d, t_df
-        if best_ctrl is not None and len(best_ctrl) >= 2:
-            cols = ['lead_time_hours', 'lat', 'lon', 'pressure', 'wind']
-            res_df = best_ctrl[cols].sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-            return res_df, best_ctrl.index, True
+                if min_d < best_dist:
+                    best_dist, best_ctrl = min_d, t_df
+            if best_ctrl is not None and len(best_ctrl) >= 2:
+                cols = ['lead_time_hours', 'lat', 'lon', 'pressure', 'wind']
+                res_df = best_ctrl[cols].sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
+                return res_df, best_ctrl.index, True
 
     return pd.DataFrame(columns=['lead_time_hours', 'lat', 'lon', 'pressure', 'wind']), pd.Index([]), False
 
@@ -1293,30 +1298,17 @@ def clean_storm_ensemble_tracks(df_storm, df_model, model_name, storm_name, atcf
         for _, r in df_mean.iterrows():
             ref_by_h[r['lead_time_hours']] = (r['lat'], r['lon'])
     else:
-        # Check paired data for ensemble mean near storm
-        if df_paired is not None and not df_paired.empty and 'sample' in df_paired.columns:
-            paired_ctrl = df_paired[df_paired['sample'] == -1]
-            if not paired_ctrl.empty and atcf_pos:
-                for tid, t_df in paired_ctrl.groupby('track_id'):
-                    t_df = t_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-                    if not t_df.empty:
-                        d = math.sqrt((t_df.iloc[0]['lat'] - atcf_pos[0])**2 + (t_df.iloc[0]['lon'] - atcf_pos[1])**2)
-                        if d < 6.0:
-                            for _, r in t_df.iterrows():
-                                ref_by_h[r['lead_time_hours']] = (r['lat'], r['lon'])
-                            break
-        # If still empty, use median of early tracks (lead <= 36h)
-        if not ref_by_h:
-            early_tracks = []
-            for (tid, sample), pts in df_storm.groupby(['track_id', 'sample']):
-                pts = pts.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-                if not pts.empty and pts.iloc[0]['lead_time_hours'] <= 36.0:
-                    early_tracks.append(pts)
-            if early_tracks:
-                df_early = pd.concat(early_tracks)
-                med = df_early.groupby('lead_time_hours')[['lat', 'lon']].median()
-                for h, r in med.iterrows():
-                    ref_by_h[h] = (r['lat'], r['lon'])
+        # Use median of early tracks (lead <= 36h) from this storm cluster
+        early_tracks = []
+        for (tid, sample), pts in df_storm.groupby(['track_id', 'sample']):
+            pts = pts.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
+            if not pts.empty and pts.iloc[0]['lead_time_hours'] <= 36.0:
+                early_tracks.append(pts)
+        if early_tracks:
+            df_early = pd.concat(early_tracks)
+            med = df_early.groupby('lead_time_hours')[['lat', 'lon']].median()
+            for h, r in med.iterrows():
+                ref_by_h[h] = (r['lat'], r['lon'])
 
     candidates = []
     for (tid, sample), pts in df_storm.groupby(['track_id', 'sample']):
@@ -1502,7 +1494,7 @@ def plot_model_tracks(
 
     # Forecast Processing & Grouping by Member
     df_mean, ctrl_indices, has_control = find_control_track_for_storm(
-        df_storm, df_model, model_name, storm_name, atcf_pos=atcf_pos, color_by=color_by
+        df_storm, df_model, model_name, storm_name, atcf_pos=atcf_pos, color_by=color_by, df_paired=df_paired
     )
 
     df_storm = clean_storm_ensemble_tracks(
@@ -1538,43 +1530,6 @@ def plot_model_tracks(
             if calc_mean_df.empty:
                 calc_mean_df = ensemble_data
 
-            matched_paired = None
-            if df_paired is not None and not df_paired.empty:
-                ref_lat, ref_lon = None, None
-                if atcf_pos is not None:
-                    ref_lat, ref_lon = atcf_pos[0], atcf_pos[1]
-                else:
-                    first_pts = calc_mean_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-                    if not first_pts.empty:
-                        ref_lat, ref_lon = first_pts.iloc[0]['lat'], first_pts.iloc[0]['lon']
-
-                if ref_lat is not None and ref_lon is not None:
-                    df_paired_mean = df_paired[df_paired['sample'] == -1].copy()
-                    best_paired_tid = None
-                    best_dist = 500.0
-
-                    for tid, t_df in df_paired_mean.groupby('track_id'):
-                        t_df = t_df.sort_values('lead_time_hours').dropna(subset=['lat', 'lon'])
-                        if len(t_df) < 2:
-                            continue
-                        first_row = t_df.iloc[0]
-                        d_km = haversine_km(first_row['lat'], first_row['lon'], ref_lat, ref_lon)
-                        if d_km < best_dist:
-                            best_dist = d_km
-                            best_paired_tid = tid
-
-                    if best_paired_tid is not None:
-                        paired_df = df_paired_mean[df_paired_mean['track_id'] == best_paired_tid].sort_values('lead_time_hours')
-                        matched_paired = []
-                        for _, row in paired_df.iterrows():
-                            matched_paired.append({
-                                'h': row['lead_time_hours'],
-                                'lat': row['lat'],
-                                'lon': row['lon'],
-                                'wind': row['wind'],
-                                'pressure': row['pressure']
-                            })
-
             raw_model_members = df_model['sample'].nunique() if 'sample' in df_model.columns else 0
             pos_model_members = df_model[df_model['sample'] > 0]['sample'].nunique() if 'sample' in df_model.columns else 0
             if raw_model_members in (63, 64) or pos_model_members in (63, 64):
@@ -1605,24 +1560,14 @@ def plot_model_tracks(
                 if len(d['lats']) < required_support:
                     continue
 
-                if matched_paired:
-                    paired_pt = min(matched_paired, key=lambda pt: abs(pt['h'] - h))
-                    if abs(paired_pt['h'] - h) <= 3:
-                        m_lat = paired_pt['lat']
-                        m_lon = paired_pt['lon']
-                        m_wind = paired_pt['wind']
-                        m_press = paired_pt['pressure']
-                    else:
-                        continue
-                else:
-                    pts_at_hour = [{'lat': lat, 'lon': lon} for lat, lon in zip(d['lats'], d['lons'])]
-                    geo_mean = mean_geo_center(pts_at_hour)
-                    m_lat = geo_mean['lat']
-                    m_lon = geo_mean['lon']
-                    valid_winds = [w for w in d['winds'] if not np.isnan(w)]
-                    m_wind = np.median(valid_winds) if valid_winds else np.nan
-                    valid_ps = [p for p in d['ps'] if not np.isnan(p)]
-                    m_press = np.median(valid_ps) if valid_ps else np.nan
+                pts_at_hour = [{'lat': lat, 'lon': lon} for lat, lon in zip(d['lats'], d['lons'])]
+                geo_mean = mean_geo_center(pts_at_hour)
+                m_lat = geo_mean['lat']
+                m_lon = geo_mean['lon']
+                valid_winds = [w for w in d['winds'] if not np.isnan(w)]
+                m_wind = np.median(valid_winds) if valid_winds else np.nan
+                valid_ps = [p for p in d['ps'] if not np.isnan(p)]
+                m_press = np.median(valid_ps) if valid_ps else np.nan
 
                 mean_points.append({
                     'lead_time_hours': h,
@@ -1870,6 +1815,7 @@ def plot_model_tracks(
         ax_map.add_feature(cfeature.BORDERS, linestyle='-', linewidth=0.5, edgecolor='#334155', alpha=0.8, zorder=2)
 
     # Philippine Province Overlay
+    prov_geoms = []
     try:
         geojson_paths = [
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "public", "data", "ph_provinces.json"),
@@ -1943,18 +1889,26 @@ def plot_model_tracks(
         track_cmap = mcolors.ListedColormap(wind_colors)
         track_norm = mcolors.BoundaryNorm(wind_bounds, track_cmap.N, extend='both')
 
-    # Line styling based on ensemble size
+    # Detect if member tracks cross or densely cluster over the Philippines
+    ph_tracks_count = 0
+    for m_df in deduped_track_dfs:
+        in_ph = ((m_df['lat'] >= 4.5) & (m_df['lat'] <= 22.0) & (m_df['lon'] >= 115.0) & (m_df['lon'] <= 130.0)).any()
+        if in_ph:
+            ph_tracks_count += 1
     is_large = (total_ensemble_members is not None and total_ensemble_members >= 200) or ('large' in model_name.lower())
+    is_dense_over_ph = ph_tracks_count >= 15 or (is_large and ph_tracks_count >= 5)
+
+    # Line styling based on ensemble size and regional density
     if is_large:
-        track_lw = 0.95
-        track_alpha = 0.40
-        halo_alpha = 0.10
-        halo_lw = 2.0
+        track_lw = 0.85 if is_dense_over_ph else 0.95
+        track_alpha = 0.32 if is_dense_over_ph else 0.40
+        halo_alpha = 0.08
+        halo_lw = 1.8
     else:
-        track_lw = 1.3
-        track_alpha = 0.85
-        halo_alpha = 0.30
-        halo_lw = 2.8
+        track_lw = 1.1 if is_dense_over_ph else 1.3
+        track_alpha = 0.70 if is_dense_over_ph else 0.85
+        halo_alpha = 0.20 if is_dense_over_ph else 0.30
+        halo_lw = 2.4 if is_dense_over_ph else 2.8
 
     # Render Member Tracks
     for member_df in deduped_track_dfs:
@@ -2000,15 +1954,25 @@ def plot_model_tracks(
         lc.set_array(np.array(seg_vals))
         ax_map.add_collection(lc)
 
+    # High-visibility Muted Slate & Silver Philippine Province & Border Overlay
+    # Rendered over dense member tracks without eye strain
+    if prov_geoms and is_dense_over_ph:
+        # 1. Subtle dark halo behind province boundaries for contrast against light track segments
+        ax_map.add_geometries(
+            prov_geoms, crs=ccrs.PlateCarree(), facecolor='none',
+            edgecolor='#090d14', linewidth=1.3, alpha=0.75, zorder=6.4
+        )
+        # 2. Muted Slate & Silver province lines (#94a3b8)
+        ax_map.add_geometries(
+            prov_geoms, crs=ccrs.PlateCarree(), facecolor='none',
+            edgecolor='#94a3b8', linewidth=0.55, alpha=0.85, zorder=6.5
+        )
+
     # Render Primary Track (Official Control or Calculated Ensemble Mean)
     plot_primary_track = len(df_mean) >= 2
     if plot_primary_track:
         m_lons = list(df_mean['lon'].dropna().values)
         m_lats = list(df_mean['lat'].dropna().values)
-
-        if atcf_pos is not None and use_live_atcf:
-            m_lats = [atcf_pos[0]] + m_lats
-            m_lons = [atcf_pos[1]] + m_lons
 
         # Double-pass stroke: white outline with dark core
         ax_map.plot(m_lons, m_lats, color='#ffffff', linewidth=5.2, zorder=7, transform=ccrs.PlateCarree())
@@ -2046,18 +2010,6 @@ def plot_model_tracks(
                     fontsize=7.5, ha='left', va='bottom', transform=ccrs.PlateCarree(), zorder=10
                 )
                 t_node.set_path_effects([path_effects.withStroke(linewidth=2.5, foreground='#090d14')])
-
-    # Live ATCF / Analysis Position Marker
-    if atcf_pos is not None:
-        ax_map.plot(
-            atcf_pos[1], atcf_pos[0], 'o', color='#38bdf8', markersize=9,
-            markeredgecolor='#ffffff', markeredgewidth=1.8, zorder=11, transform=ccrs.PlateCarree()
-        )
-        t_init = ax_map.text(
-            atcf_pos[1] + 0.35, atcf_pos[0] - 0.45, "CURRENT", color='#38bdf8', weight='heavy',
-            fontsize=7.5, transform=ccrs.PlateCarree(), zorder=11
-        )
-        t_init.set_path_effects([path_effects.withStroke(linewidth=2.5, foreground='#090d14')])
 
     # Set Map Extent & Frame
     ax_map.set_extent([view_lon_min, view_lon_max, view_lat_min, view_lat_max], crs=ccrs.PlateCarree())
@@ -2173,7 +2125,9 @@ def plot_model_tracks(
         # Right Column (WHERE & Control Status)
         ax_card1.text(0.52, 0.77, "WHERE", fontsize=6.8, weight='bold', color='#94a3b8', transform=ax_card1.transAxes)
         ctrl_hit = lf_info.get('ctrl_hit')
-        if ctrl_hit:
+        if not has_control:
+            ax_card1.text(0.95, 0.77, "CTRL: NONE", fontsize=6.3, weight='heavy', color='#64748b', ha='right', transform=ax_card1.transAxes)
+        elif ctrl_hit:
             ctrl_short = ctrl_hit['muni'].upper()
             ax_card1.text(0.95, 0.77, f"★ CTRL: {ctrl_short}", fontsize=6.3, weight='heavy', color='#facc15', ha='right', transform=ax_card1.transAxes)
         else:
@@ -2672,6 +2626,80 @@ def map_hdbscan_clusters_to_knack_storms(df, knack_storms, dist_threshold=4.0):
         
     return df, has_mapped
 
+def assign_tracks_to_knack_storms(df, knack_storms):
+    """
+    Directly assigns each ensemble member track to its matching Knack active storm:
+    1. First checks if track_id explicitly references the storm (e.g. WP27, 27W, WP95, 95W, WP96, 96W).
+    2. Otherwise checks proximity of the track's earliest available point (lead <= 48h)
+       to the active storm position (within 880km / ~8 degrees).
+    Ensures every active storm in the basin gets its respective tracks cleanly partitioned
+    without multi-storm cluster merging artifacts.
+    """
+    if df.empty or not knack_storms:
+        return df, False
+
+    df = df.copy()
+    df['storm_group'] = 'UNKNOWN'
+    df['storm_group_name'] = 'UNKNOWN'
+    df['rep_track_id'] = 'UNKNOWN'
+
+    storm_info = {}
+    for s in knack_storms:
+        num_m = re.search(r'(\d{2})', str(s.get('atcf_id', '')))
+        num = num_m.group(1) if num_m else ''
+        display_name = get_storm_display_name(s['atcf_id'])
+        k_name = s.get('name', '')
+        if k_name and not k_name.upper().startswith('INVEST') and not k_name.upper().startswith('WP') and k_name.upper() != s['atcf_id'].upper():
+            display_name = f"{k_name.upper()} ({s['atcf_id']})"
+        storm_info[s['atcf_id']] = {
+            'num': num,
+            'lat': s['lat'],
+            'lon': s['lon'],
+            'atcf_id': s['atcf_id'],
+            'display_name': display_name
+        }
+
+    has_mapped = False
+    for (tid, sid), t_df in df.groupby(['track_id', 'sample']):
+        early = t_df[t_df['lead_time_hours'] <= 48.0].dropna(subset=['lat', 'lon'])
+        if early.empty:
+            continue
+        first_row = early.iloc[0]
+        f_lat, f_lon = first_row['lat'], first_row['lon']
+
+        best_s = None
+        # 1. Match by storm number in track_id
+        for atcf_id, s_data in storm_info.items():
+            n = s_data['num']
+            if n and (f"WP{n}" in str(tid).upper() or f"{n}W" in str(tid).upper()):
+                best_s = atcf_id
+                break
+
+        # 2. Match by proximity to active storm
+        if best_s is None:
+            min_d = float('inf')
+            for atcf_id, s_data in storm_info.items():
+                if np.isnan(s_data['lat']) or np.isnan(s_data['lon']):
+                    continue
+                d = haversine_km(f_lat, f_lon, s_data['lat'], s_data['lon'])
+                if d < min_d:
+                    min_d = d
+                    if d <= 880.0:  # ~8 degrees
+                        best_s = atcf_id
+
+        if best_s:
+            s_data = storm_info[best_s]
+            t_idx = t_df.index
+            df.loc[t_idx, 'storm_group'] = f"knack_{best_s}"
+            df.loc[t_idx, 'storm_group_name'] = s_data['display_name']
+            df.loc[t_idx, 'rep_track_id'] = best_s
+            has_mapped = True
+
+    if has_mapped:
+        df = df[df['storm_group'].str.startswith('knack_')].copy()
+
+    return df, has_mapped
+
 def main():
     parser = argparse.ArgumentParser(description="Ensemble Track Visualization System")
     parser.add_argument('--input', type=str, nargs='*', help="Input ENC, DAT, CSV, or ATCF files")
@@ -2793,17 +2821,17 @@ def main():
                 if not raw_paired_df.empty:
                     df_paired = normalize_dataframe(raw_paired_df)
         
-        # First, run custom HDBSCAN trajectory clustering to find forecast disturbances
-        wp_df = cluster_genesis_locations(wp_df)
-        
-        # Next, map these HDBSCAN clusters to the Knack active storms
-        wp_df, has_mapped = map_hdbscan_clusters_to_knack_storms(wp_df, knack_storms)
-        if has_mapped:
-            # Focus only on tracks that belong to clusters mapped to real Knack storms
-            wp_df = wp_df[wp_df['storm_group'].str.startswith('knack_')].copy()
-        else:
-            print(f"No HDBSCAN clusters matched Knack active storms in: {f_path}. Skipping.")
-            continue
+        # Partition tracks by Knack active storms
+        wp_df, has_mapped = assign_tracks_to_knack_storms(wp_df, knack_storms)
+        if not has_mapped:
+            # Fallback to HDBSCAN clustering if Knack matching found no tracks
+            wp_df = cluster_genesis_locations(wp_df)
+            wp_df, has_mapped = map_hdbscan_clusters_to_knack_storms(wp_df, knack_storms)
+            if has_mapped:
+                wp_df = wp_df[wp_df['storm_group'].str.startswith('knack_')].copy()
+            else:
+                print(f"No clusters matched Knack active storms in: {f_path}. Skipping.")
+                continue
             
         # Group and plot by storm_group
         storm_groups = wp_df['storm_group'].dropna().unique()
