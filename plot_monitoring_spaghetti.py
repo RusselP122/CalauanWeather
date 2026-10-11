@@ -1336,9 +1336,17 @@ def plot_monitoring_tracks(
     coast_color = '#64748b'
 
     ax_map.add_feature(cfeature.OCEAN, facecolor=ocean_color, zorder=1)
-    ax_map.add_feature(cfeature.LAND, facecolor=land_color, edgecolor=border_color, linewidth=0.6, zorder=2)
-    ax_map.add_feature(cfeature.COASTLINE, edgecolor=coast_color, linewidth=0.8, zorder=3)
-    ax_map.add_feature(cfeature.BORDERS, linestyle='-', edgecolor=border_color, linewidth=0.6, zorder=3)
+    try:
+        land_feature = cfeature.NaturalEarthFeature('physical', 'land', '50m', facecolor=land_color, edgecolor='none')
+        coast_feature = cfeature.NaturalEarthFeature('physical', 'coastline', '50m', edgecolor=coast_color, linewidth=0.7, facecolor='none')
+        borders_feature = cfeature.NaturalEarthFeature('cultural', 'admin_0_boundary_lines_land', '50m', edgecolor=border_color, linewidth=0.5, linestyle='-', alpha=0.8, facecolor='none')
+        ax_map.add_feature(land_feature, zorder=2)
+        ax_map.add_feature(coast_feature, zorder=3)
+        ax_map.add_feature(borders_feature, zorder=3)
+    except Exception:
+        ax_map.add_feature(cfeature.LAND, facecolor=land_color, edgecolor='none', zorder=2)
+        ax_map.add_feature(cfeature.COASTLINE, edgecolor=coast_color, linewidth=0.7, zorder=3)
+        ax_map.add_feature(cfeature.BORDERS, linestyle='-', edgecolor=border_color, linewidth=0.5, zorder=3)
 
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))

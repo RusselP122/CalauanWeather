@@ -239,7 +239,7 @@ def check_single_track_landfall(tdf, tree, geoms, props):
 
     return None
 
-def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
+def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None, mean_df=None):
     """
     Calculates Philippine landfall probability, timing in PHT, strength, top locations,
     and category distribution across ensemble members and control track.
@@ -257,9 +257,11 @@ def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
             'landfalling_count': 0,
             'total_members': total_members,
             'landfall_pct_str': "0%",
+            'timing_label': "TIMING (IF LANDFALL)",
             'top_places': [],
             'cat_dist': [],
             'ctrl_hit': None,
+            'ens_mean_hit': None,
             'n_offshore': total_members,
             'offshore_str': "100%",
             'offshore_val': 100.0
@@ -268,6 +270,10 @@ def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
     ctrl_hit = None
     if ctrl_df is not None and not ctrl_df.empty:
         ctrl_hit = check_single_track_landfall(ctrl_df, tree, geoms, props)
+
+    ens_mean_hit = None
+    if mean_df is not None and not mean_df.empty:
+        ens_mean_hit = check_single_track_landfall(mean_df, tree, geoms, props)
 
     landfalls = []
     for tdf in track_dfs:
@@ -288,15 +294,43 @@ def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
             'landfalling_count': 0,
             'total_members': effective_total,
             'landfall_pct_str': "0%",
+            'timing_label': "TIMING (IF LANDFALL)",
             'top_places': [],
             'cat_dist': [],
             'ctrl_hit': None,
+            'ens_mean_hit': ens_mean_hit,
             'n_offshore': effective_total,
             'offshore_str': "100%",
             'offshore_val': 100.0
         }
 
     raw_lf_pct, lf_pct_str = format_percentage(n_hits, effective_total)
+
+    # Check recurve scenario across member tracks (curving northward/northeastward into the open Pacific)
+    n_recurve = 0
+    for tdf in track_dfs:
+        if len(tdf) >= 2:
+            first_r = tdf.iloc[0]
+            last_r = tdf.iloc[-1]
+            if (last_r['lat'] >= 21.0 and last_r['lon'] >= 126.0) or (last_r['lon'] - first_r['lon'] > 4.0 and last_r['lat'] > 17.0):
+                n_recurve += 1
+    has_recurve = (n_recurve / max(len(track_dfs), 1)) >= 0.25
+
+    # Dynamic Timing Header Logic:
+    # MOST LIKELY is displayed when:
+    #   High-percentage consensus for landfall (>= 50% of ensemble members, or >= 40% when the ensemble mean and control runs both confirm landfall)
+    # TIMING (IF LANDFALL) is displayed when:
+    #   Members exhibit a recurve scenario and ensemble mean remains offshore, OR
+    #   Landfall percentage is low/minority (< 50%)
+    is_high_percentage_landfall = (
+        (raw_lf_pct >= 50.0) or
+        (raw_lf_pct >= 40.0 and ctrl_hit is not None and ens_mean_hit is not None)
+    )
+
+    if is_high_percentage_landfall:
+        timing_label = "MOST LIKELY"
+    else:
+        timing_label = "TIMING (IF LANDFALL)"
 
     # Lead times and intensity metrics from member hits (fallback to control if 0 member hits)
     eval_hits = landfalls if landfalls else [ctrl_hit]
@@ -410,12 +444,14 @@ def compute_ph_landfalls(track_dfs, total_members, init_dt, ctrl_df=None):
         'landfalling_count': n_hits,
         'total_members': effective_total,
         'landfall_pct_str': lf_pct_str,
+        'timing_label': timing_label,
         'most_likely_str': most_likely_str,
         'window_str': window_str,
         'strength_str': strength_str,
         'top_places': top_places,
         'cat_dist': cat_dist,
         'ctrl_hit': ctrl_hit,
+        'ens_mean_hit': ens_mean_hit,
         'n_offshore': n_offshore,
         'offshore_str': offshore_str,
         'offshore_val': offshore_val
@@ -1422,22 +1458,47 @@ def plot_model_tracks(
                 active_storm_info = ks
                 break
 
+    rep_track_id = df_storm['rep_track_id'].dropna().iloc[0] if ('rep_track_id' in df_storm.columns and not df_storm['rep_track_id'].dropna().empty) else ''
+
     if active_storm_info:
         real_name = active_storm_info.get('name', storm_name).strip()
         real_id = active_storm_info.get('atcf_id', atcf_id_clean).strip().upper()
-        if real_name.upper() not in ('INVEST', 'UNKNOWN', ''):
-            storm_title_display = f"{real_name.upper()} ({real_id})"
-            is_invest = False
-        else:
-            storm_title_display = f"INVEST {real_id}"
-            is_invest = True
         current_winds = active_storm_info.get('winds')
         current_pres = active_storm_info.get('pressure')
     else:
-        is_invest = ('9' in atcf_id_clean and len(atcf_id_clean) == 3) or 'INVEST' in storm_name.upper()
-        storm_title_display = storm_name.upper()
+        real_name = storm_name.strip()
+        real_id = atcf_id_clean.strip().upper()
         current_winds = None
         current_pres = None
+
+    # Check for official name vs invest vs numbered WP cyclone
+    has_name = bool(real_name and real_name.upper() not in ('INVEST', 'UNKNOWN', 'LPA', '', 'NONE', 'N/A') and not real_name.upper().startswith('INVEST'))
+
+    # Extract numerical cyclone id if present (e.g., 90W-99W vs 01W-49W or WP01-WP49)
+    check_ids = [real_id, atcf_id_clean, rep_track_id, storm_name]
+    tc_num = None
+    for cid in check_ids:
+        if cid:
+            m_tc = re.search(r'(?:WP)?(\d{2})(?:W)?', str(cid).upper())
+            if m_tc:
+                tc_num = int(m_tc.group(1))
+                break
+
+    if has_name:
+        is_invest = False
+        storm_title_display = f"{real_name.upper()} ({real_id})" if real_id else real_name.upper()
+    elif tc_num is not None and 1 <= tc_num < 90:
+        # Officially numbered tropical cyclone (e.g. WP01 to WP49 or 01W to 49W)
+        is_invest = False
+        display_id = real_id if real_id else f"WP{tc_num:02d}"
+        storm_title_display = f"TROPICAL CYCLONE {display_id}"
+    elif (tc_num is not None and 90 <= tc_num <= 99) or 'INVEST' in str(storm_name).upper() or 'INVEST' in str(real_name).upper():
+        is_invest = True
+        display_id = real_id if real_id else (f"{tc_num}W" if tc_num is not None else storm_name.upper())
+        storm_title_display = f"INVEST {display_id}" if not display_id.startswith('INVEST') else display_id
+    else:
+        is_invest = False
+        storm_title_display = real_name.upper() if real_name else (real_id if real_id else "TROPICAL SYSTEM")
 
     # Forecast Processing & Grouping by Member
     df_mean, ctrl_indices, has_control = find_control_track_for_storm(
@@ -1795,10 +1856,18 @@ def plot_model_tracks(
     ax_map = fig.add_axes([0.035, 0.20, 0.585, 0.70], projection=ccrs.PlateCarree())
     ax_map.set_facecolor('#0b1329')
 
-    # Cartopy features
-    ax_map.add_feature(cfeature.LAND, facecolor='#1e293b', edgecolor='#334155', linewidth=0.8, zorder=1)
-    ax_map.add_feature(cfeature.COASTLINE, edgecolor='#475569', linewidth=0.8, zorder=2)
-    ax_map.add_feature(cfeature.BORDERS, linestyle='-', edgecolor='#475569', linewidth=0.8, zorder=2)
+    # Cartopy features (50m high-resolution for smooth, natural geography matching ph_provinces)
+    try:
+        land_feature = cfeature.NaturalEarthFeature('physical', 'land', '50m', facecolor='#1e293b', edgecolor='none')
+        coast_feature = cfeature.NaturalEarthFeature('physical', 'coastline', '50m', edgecolor='#475569', linewidth=0.7, facecolor='none')
+        borders_feature = cfeature.NaturalEarthFeature('cultural', 'admin_0_boundary_lines_land', '50m', edgecolor='#334155', linewidth=0.5, linestyle='-', alpha=0.8, facecolor='none')
+        ax_map.add_feature(land_feature, zorder=1)
+        ax_map.add_feature(coast_feature, zorder=2)
+        ax_map.add_feature(borders_feature, zorder=2)
+    except Exception:
+        ax_map.add_feature(cfeature.LAND, facecolor='#1e293b', edgecolor='none', zorder=1)
+        ax_map.add_feature(cfeature.COASTLINE, linewidth=0.7, edgecolor='#475569', zorder=2)
+        ax_map.add_feature(cfeature.BORDERS, linestyle='-', linewidth=0.5, edgecolor='#334155', alpha=0.8, zorder=2)
 
     # Philippine Province Overlay
     try:
@@ -2045,11 +2114,11 @@ def plot_model_tracks(
 
     # Section 3: Status Badge
     status_box = mpatches.Rectangle(
-        (0.74, tw_y), 0.22, tw_h, transform=ax_leg.transAxes,
+        (0.725, tw_y), 0.25, tw_h, transform=ax_leg.transAxes,
         facecolor='#1e293b', edgecolor='#334155', linewidth=0.8
     )
     ax_leg.add_patch(status_box)
-    status_text = "OFFICIAL ATCF INVEST" if is_invest else "ACTIVE TROPICAL CYCLONE"
+    status_text = "Potential Tropical System" if is_invest else "Active Tropical Cyclone"
     status_color = '#fbbf24' if is_invest else '#38bdf8'
     ax_leg.text(
         0.85, tw_y + tw_h / 2, status_text,
@@ -2080,7 +2149,11 @@ def plot_model_tracks(
         spine.set_edgecolor('#222d3d')
         spine.set_linewidth(1.0)
 
-    lf_info = compute_ph_landfalls(deduped_track_dfs, total_ensemble_members, init_dt, ctrl_df=df_mean if has_control else None)
+    lf_info = compute_ph_landfalls(
+        deduped_track_dfs, total_ensemble_members, init_dt,
+        ctrl_df=df_mean if has_control else None,
+        mean_df=df_mean if not has_control else None
+    )
 
     if lf_info['has_landfall']:
         # Header
@@ -2089,7 +2162,8 @@ def plot_model_tracks(
                       fontsize=8.5, weight='heavy', color='#38bdf8', ha='right', transform=ax_card1.transAxes)
 
         # Left Column (Timing & Intensity)
-        ax_card1.text(0.05, 0.77, "MOST LIKELY", fontsize=6.8, weight='bold', color='#94a3b8', transform=ax_card1.transAxes)
+        timing_header = lf_info.get('timing_label', 'TIMING (IF LANDFALL)')
+        ax_card1.text(0.05, 0.77, timing_header, fontsize=6.8, weight='bold', color='#94a3b8', transform=ax_card1.transAxes)
         ax_card1.text(0.05, 0.66, lf_info['most_likely_str'], fontsize=9.5, weight='heavy', color='#ffffff', transform=ax_card1.transAxes)
         ax_card1.text(0.05, 0.57, lf_info['window_str'], fontsize=6.3, weight='bold', color='#94a3b8', transform=ax_card1.transAxes)
 
