@@ -1057,7 +1057,8 @@ def plot_monitoring_tracks(
     min_mean_members=25,
     total_ensemble_members=None,
     knack_storms=None,
-    atcf_index_storms=None
+    atcf_index_storms=None,
+    show_genesis=False
 ):
     """
     Renders an elite broadcast-grade infographic for an under-monitoring cluster
@@ -1397,72 +1398,50 @@ def plot_monitoring_tracks(
     gl.xlabel_style = {'size': 8.0, 'color': '#64748b', 'weight': 'bold'}
     gl.ylabel_style = {'size': 8.0, 'color': '#64748b', 'weight': 'bold'}
 
-    # Genesis contours
-    early_pts = []
-    for tdf in deduped_track_dfs:
-        early_sub = tdf[tdf['lead_time_hours'] <= (tdf['lead_time_hours'].min() + 36)]
-        for _, r in early_sub.iterrows():
-            if not np.isnan(r['lon']) and not np.isnan(r['lat']):
-                early_pts.append((r['lon'], r['lat']))
+    # Genesis contours (optional, disabled by default to remove clutter)
+    if show_genesis:
+        early_pts = []
+        for tdf in deduped_track_dfs:
+            if not tdf.empty:
+                r0 = tdf.iloc[0]
+                if not np.isnan(r0['lon']) and not np.isnan(r0['lat']):
+                    early_pts.append((r0['lon'], r0['lat']))
 
-    if len(early_pts) >= 6:
-        e_lons = [p[0] for p in early_pts]
-        e_lats = [p[1] for p in early_pts]
+        if len(early_pts) >= 6:
+            e_lons = [p[0] for p in early_pts]
+            e_lats = [p[1] for p in early_pts]
 
-        g_min_x, g_max_x = min(e_lons) - 3.5, max(e_lons) + 3.5
-        g_min_y, g_max_y = min(e_lats) - 3.5, max(e_lats) + 3.5
-        gx, gy = np.mgrid[g_min_x:g_max_x:120j, g_min_y:g_max_y:120j]
-        positions = np.vstack([gx.ravel(), gy.ravel()])
-        values = np.vstack([e_lons, e_lats])
+            g_min_x, g_max_x = min(e_lons) - 2.0, max(e_lons) + 2.0
+            g_min_y, g_max_y = min(e_lats) - 2.0, max(e_lats) + 2.0
+            gx, gy = np.mgrid[g_min_x:g_max_x:120j, g_min_y:g_max_y:120j]
+            positions = np.vstack([gx.ravel(), gy.ravel()])
+            values = np.vstack([e_lons, e_lats])
 
-        kde = gaussian_kde(values, bw_method=0.40)
-        gz = np.reshape(kde(positions).T, gx.shape)
-        gz_norm = (gz / gz.max()) * 100.0
+            kde = gaussian_kde(values, bw_method=0.20)
+            gz = np.reshape(kde(positions).T, gx.shape)
+            gz_norm = (gz / gz.max()) * 100.0
 
-        levels = [15, 30, 45, 60, 80, 100]
-        kde_colors = ['#0c2340', '#133e68', '#1a5994', '#1f78c1', '#28a0f0']
-        ax_map.contourf(
-            gx, gy, gz_norm, levels=levels,
-            colors=kde_colors, alpha=0.40,
-            transform=ccrs.PlateCarree(), zorder=3
-        )
-        cs_lines = ax_map.contour(
-            gx, gy, gz_norm, levels=[20, 40, 60, 80],
-            colors=['#60a5fa', '#93c5fd', '#bfdbfe', '#ffffff'],
-            linewidths=[0.8, 1.0, 1.2, 1.5],
-            transform=ccrs.PlateCarree(), zorder=4
-        )
-        # Keep two clean, uncollided labels (20% and 60%)
-        clabels = ax_map.clabel(
-            cs_lines, levels=[20, 60], inline=True,
-            fontsize=7.5, fmt='%1.0f%%', colors='#ffffff', zorder=5
-        )
-        for cl in clabels:
-            cl.set_rotation(0)  # Horizontal labels
-            cl.set_weight('bold')
-            cl.set_path_effects([path_effects.withStroke(linewidth=2.5, foreground='#090d14')])
-
-        gen_center_lon = np.median(e_lons)
-        gen_center_lat = np.median(e_lats)
-        lon_spread = max(3.0, np.std(e_lons) * 2.2)
-        lat_spread = max(2.5, np.std(e_lats) * 2.2)
-
-        # Dynamic color based on 7-day potential: Amber for <60%, Red for >=60%
-        if dev_7d_pct >= 60:
-            threat_color = '#ef4444'
-        elif dev_7d_pct >= 30:
-            threat_color = '#f97316'
-        else:
-            threat_color = '#fbbf24'
-
-        envelope = mpatches.Ellipse(
-            (gen_center_lon, gen_center_lat),
-            width=lon_spread * 2.4, height=lat_spread * 2.4,
-            angle=15, facecolor=threat_color, alpha=0.07,
-            edgecolor=threat_color, linestyle='--', linewidth=1.6,
-            transform=ccrs.PlateCarree(), zorder=4
-        )
-        ax_map.add_patch(envelope)
+            levels = [30, 50, 70, 85, 100]
+            kde_colors = ['#0c2340', '#133e68', '#1a5994', '#1f78c1', '#28a0f0']
+            ax_map.contourf(
+                gx, gy, gz_norm, levels=levels,
+                colors=kde_colors, alpha=0.35,
+                transform=ccrs.PlateCarree(), zorder=3
+            )
+            cs_lines = ax_map.contour(
+                gx, gy, gz_norm, levels=[40, 70],
+                colors=['#60a5fa', '#ffffff'],
+                linewidths=[0.8, 1.2],
+                transform=ccrs.PlateCarree(), zorder=4
+            )
+            clabels = ax_map.clabel(
+                cs_lines, levels=[40, 70], inline=True,
+                fontsize=7.2, fmt='%1.0f%%', colors='#ffffff', zorder=5
+            )
+            for cl in clabels:
+                cl.set_rotation(0)
+                cl.set_weight('bold')
+                cl.set_path_effects([path_effects.withStroke(linewidth=2.0, foreground='#090d14')])
 
     # Tracks
     wind_bounds = [20, 30, 40, 50, 60, 70, 80, 100, 120, 140]
@@ -1569,80 +1548,125 @@ def plot_monitoring_tracks(
         spine.set_edgecolor('#1e293b')
         spine.set_linewidth(1.0)
 
-    # Section 1: Genesis within 60 NM (%)
-    ax_leg.text(
-        0.02, 0.72, "GENESIS WITHIN 60 NM (%)",
-        transform=ax_leg.transAxes, fontsize=6.8, weight='heavy', color='#e2e8f0', va='center'
-    )
-    step_x = 0.02
-    step_w = 0.034
-    step_h = 0.28
-    step_y = 0.26
-    density_steps = [20, 40, 60, 80, 100]
-    dens_colors = ['#133e68', '#1a5994', '#1f78c1', '#28a0f0', '#93c5fd']
-    ax_leg.text(
-        step_x, step_y - 0.06, "0",
-        transform=ax_leg.transAxes, fontsize=6.2, color='#94a3b8', ha='center', va='top'
-    )
-    for idx, (val, col) in enumerate(zip(density_steps, dens_colors)):
-        rect = mpatches.Rectangle(
-            (step_x + idx * step_w, step_y), step_w, step_h,
-            transform=ax_leg.transAxes, facecolor=col, edgecolor='#090d14', linewidth=0.5
-        )
-        ax_leg.add_patch(rect)
+    if show_genesis:
+        # Section 1: Genesis within 60 NM (%)
         ax_leg.text(
-            step_x + idx * step_w + step_w / 2, step_y - 0.06, f"{val}",
+            0.02, 0.72, "GENESIS WITHIN 60 NM (%)",
+            transform=ax_leg.transAxes, fontsize=6.8, weight='heavy', color='#e2e8f0', va='center'
+        )
+        step_x = 0.02
+        step_w = 0.034
+        step_h = 0.28
+        step_y = 0.26
+        density_steps = [20, 40, 60, 80, 100]
+        dens_colors = ['#133e68', '#1a5994', '#1f78c1', '#28a0f0', '#93c5fd']
+        ax_leg.text(
+            step_x, step_y - 0.06, "0",
             transform=ax_leg.transAxes, fontsize=6.2, color='#94a3b8', ha='center', va='top'
         )
+        for idx, (val, col) in enumerate(zip(density_steps, dens_colors)):
+            rect = mpatches.Rectangle(
+                (step_x + idx * step_w, step_y), step_w, step_h,
+                transform=ax_leg.transAxes, facecolor=col, edgecolor='#090d14', linewidth=0.5
+            )
+            ax_leg.add_patch(rect)
+            ax_leg.text(
+                step_x + idx * step_w + step_w / 2, step_y - 0.06, f"{val}",
+                transform=ax_leg.transAxes, fontsize=6.2, color='#94a3b8', ha='center', va='top'
+            )
 
-    # Section 2: Track Wind (KT)
-    ax_leg.text(
-        0.24, 0.72, "TRACK WIND (KT)",
-        transform=ax_leg.transAxes, fontsize=6.8, weight='heavy', color='#e2e8f0', va='center'
-    )
-    tw_x = 0.24
-    tw_w = 0.040
-    tw_h = 0.28
-    tw_y = 0.26
-    for idx, col in enumerate(wind_colors):
-        rect = mpatches.Rectangle(
-            (tw_x + idx * tw_w, tw_y), tw_w, tw_h,
-            transform=ax_leg.transAxes, facecolor=col, edgecolor='#090d14', linewidth=0.5
-        )
-        ax_leg.add_patch(rect)
-    tw_ticks = [
-        (0, '20'),
-        (2, '40'),
-        (4, '60'),
-        (6, '80'),
-        (7, '100'),
-        (8, '120'),
-        (10, '140+')
-    ]
-    for idx, lbl in tw_ticks:
+        # Section 2: Track Wind (KT)
         ax_leg.text(
-            tw_x + idx * tw_w, tw_y - 0.06, lbl,
-            transform=ax_leg.transAxes, fontsize=6.2, color='#94a3b8', ha='center', va='top'
+            0.24, 0.72, "TRACK WIND (KT)",
+            transform=ax_leg.transAxes, fontsize=6.8, weight='heavy', color='#e2e8f0', va='center'
+        )
+        tw_x = 0.24
+        tw_w = 0.040
+        tw_h = 0.28
+        tw_y = 0.26
+        for idx, col in enumerate(wind_colors):
+            rect = mpatches.Rectangle(
+                (tw_x + idx * tw_w, tw_y), tw_w, tw_h,
+                transform=ax_leg.transAxes, facecolor=col, edgecolor='#090d14', linewidth=0.5
+            )
+            ax_leg.add_patch(rect)
+        tw_ticks = [
+            (0, '20'),
+            (2, '40'),
+            (4, '60'),
+            (6, '80'),
+            (7, '100'),
+            (8, '120'),
+            (10, '140+')
+        ]
+        for idx, lbl in tw_ticks:
+            ax_leg.text(
+                tw_x + idx * tw_w, tw_y - 0.06, lbl,
+                transform=ax_leg.transAxes, fontsize=6.2, color='#94a3b8', ha='center', va='top'
+            )
+
+        # Section 3: Monitoring Status
+        ax_leg.text(
+            0.74, 0.72, "MONITORING STATUS",
+            transform=ax_leg.transAxes, fontsize=6.8, weight='heavy', color='#e2e8f0', va='center'
+        )
+        status_box = mpatches.Rectangle(
+            (0.74, tw_y), 0.23, tw_h, transform=ax_leg.transAxes,
+            facecolor='#1e293b', edgecolor='#334155', linewidth=0.8
+        )
+        ax_leg.add_patch(status_box)
+        ax_leg.text(
+            0.855, tw_y + tw_h / 2, "POTENTIAL GENESIS CLUSTER",
+            transform=ax_leg.transAxes, fontsize=6.6, weight='bold', color='#38bdf8',
+            ha='center', va='center'
+        )
+    else:
+        # Genesis removed: Clean layout with prominent Track Wind and Monitoring Status
+        ax_leg.text(
+            0.035, 0.72, "TRACK WIND (KT)",
+            transform=ax_leg.transAxes, fontsize=7.2, weight='heavy', color='#e2e8f0', va='center'
+        )
+        tw_x = 0.035
+        tw_w = 0.052
+        tw_h = 0.28
+        tw_y = 0.26
+        for idx, col in enumerate(wind_colors):
+            rect = mpatches.Rectangle(
+                (tw_x + idx * tw_w, tw_y), tw_w, tw_h,
+                transform=ax_leg.transAxes, facecolor=col, edgecolor='#090d14', linewidth=0.5
+            )
+            ax_leg.add_patch(rect)
+        tw_ticks = [
+            (0, '20'),
+            (2, '40'),
+            (4, '60'),
+            (6, '80'),
+            (7, '100'),
+            (8, '120'),
+            (10, '140+')
+        ]
+        for idx, lbl in tw_ticks:
+            ax_leg.text(
+                tw_x + idx * tw_w, tw_y - 0.06, lbl,
+                transform=ax_leg.transAxes, fontsize=6.5, color='#94a3b8', ha='center', va='top'
+            )
+
+        # Monitoring Status
+        ax_leg.text(
+            0.69, 0.72, "MONITORING STATUS",
+            transform=ax_leg.transAxes, fontsize=7.2, weight='heavy', color='#e2e8f0', va='center'
+        )
+        status_box = mpatches.Rectangle(
+            (0.69, tw_y), 0.27, tw_h, transform=ax_leg.transAxes,
+            facecolor='#1e293b', edgecolor='#334155', linewidth=0.8
+        )
+        ax_leg.add_patch(status_box)
+        ax_leg.text(
+            0.825, tw_y + tw_h / 2, "POTENTIAL GENESIS CLUSTER",
+            transform=ax_leg.transAxes, fontsize=7.0, weight='bold', color='#38bdf8',
+            ha='center', va='center'
         )
 
-    # Section 3: Monitoring Status
-    ax_leg.text(
-        0.74, 0.72, "MONITORING STATUS",
-        transform=ax_leg.transAxes, fontsize=6.8, weight='heavy', color='#e2e8f0', va='center'
-    )
-    status_box = mpatches.Rectangle(
-        (0.74, tw_y), 0.23, tw_h, transform=ax_leg.transAxes,
-        facecolor='#1e293b', edgecolor='#334155', linewidth=0.8
-    )
-    ax_leg.add_patch(status_box)
-    ax_leg.text(
-        0.855, tw_y + tw_h / 2, "POTENTIAL GENESIS CLUSTER",
-        transform=ax_leg.transAxes, fontsize=6.6, weight='bold', color='#38bdf8',
-        ha='center', va='center'
-    )
-
-    # Right Column Cards
-    card_x = 0.640
     # Right Column Cards
     card_x = 0.640
     card_w = 0.325
@@ -1913,6 +1937,7 @@ def main():
     parser.add_argument('--nursery-gap-h', type=float, default=96.0, help="Maximum timing gap in lead hours between genesis times for nursery aggregation")
     parser.add_argument('--min-motion-disp', type=float, default=120.0, help="Minimum 48h displacement in km required to evaluate heading compatibility")
     parser.add_argument('--max-member-overlap', type=float, default=0.20, help="Maximum ensemble member overlap ratio to allow merging as alternative realizations")
+    parser.add_argument('--show-genesis', action='store_true', default=False, help="Render compact genesis density contours on map (default: False, genesis removed)")
     args = parser.parse_args()
 
     input_files = args.input
@@ -2070,7 +2095,8 @@ def main():
                 min_mean_members=eff_min_mean_members,
                 total_ensemble_members=total_members,
                 knack_storms=knack_storms,
-                atcf_index_storms=atcf_index_storms
+                atcf_index_storms=atcf_index_storms,
+                show_genesis=args.show_genesis
             )
             latest_plotted_init[out_file] = current_init_dt
 
