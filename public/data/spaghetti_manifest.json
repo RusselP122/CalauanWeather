@@ -987,7 +987,7 @@
     "filename": "MONITORING_LPA01_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261013_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-13T20:51:10.755933+00:00"
+    "timestamp": "2026-10-13T23:06:53.525870+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -999,7 +999,7 @@
     "filename": "MONITORING_LPA02_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261013_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-13T20:51:15.433730+00:00"
+    "timestamp": "2026-10-13T23:06:57.544277+00:00"
   },
   {
     "storm_id": "MONITORING_LPA04",
@@ -1011,7 +1011,7 @@
     "filename": "MONITORING_LPA04_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA04_20261013_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-13T20:51:17.577542+00:00"
+    "timestamp": "2026-10-13T23:06:59.378025+00:00"
   },
   {
     "storm_id": "MONITORING_LPA03",
@@ -1023,7 +1023,7 @@
     "filename": "MONITORING_LPA03_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA03_20261013_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-13T20:51:19.999371+00:00"
+    "timestamp": "2026-10-13T23:07:01.570118+00:00"
   },
   {
     "storm_id": "WP27",
@@ -1034,7 +1034,7 @@
     "unique_key": "WP27_20261013T12Z",
     "filename": "WP27_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "WP27_20261013_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-13T20:51:54.609334+00:00"
+    "timestamp": "2026-10-13T23:07:32.654636+00:00"
   },
   {
     "storm_id": "WP28",
@@ -1045,7 +1045,7 @@
     "unique_key": "WP28_20261013T12Z",
     "filename": "WP28_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "WP28_20261013_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-13T20:52:09.687547+00:00"
+    "timestamp": "2026-10-13T23:07:46.097227+00:00"
   },
   {
     "storm_id": "WP96",
@@ -1056,6 +1056,63 @@
     "unique_key": "WP96_20261013T12Z",
     "filename": "WP96_20261013_12Z_gdm_wnc_large.png",
     "alt_filename": "WP96_20261013_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-13T20:52:51.248538+00:00"
+    "timestamp": "2026-10-13T23:08:22.211333+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261013",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA01_20261013T12Z",
+    "filename": "MONITORING_LPA01_20261013_12Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA01_20261013_12Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-13T23:06:26.320802+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261013",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA02_20261013T12Z",
+    "filename": "MONITORING_LPA02_20261013_12Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA02_20261013_12Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-13T23:06:27.561570+00:00"
+  },
+  {
+    "storm_id": "WP27",
+    "atcf_id": "27W",
+    "init_date": "20261013",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP27_20261013T12Z",
+    "filename": "WP27_20261013_12Z_gdm_wncv3.png",
+    "alt_filename": "WP27_20261013_12Z_gdm_wncv3.png",
+    "timestamp": "2026-10-13T23:07:05.441297+00:00"
+  },
+  {
+    "storm_id": "WP28",
+    "atcf_id": "28W",
+    "init_date": "20261013",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP28_20261013T12Z",
+    "filename": "WP28_20261013_12Z_gdm_wncv3.png",
+    "alt_filename": "WP28_20261013_12Z_gdm_wncv3.png",
+    "timestamp": "2026-10-13T23:07:07.375869+00:00"
+  },
+  {
+    "storm_id": "WP96",
+    "atcf_id": "96W",
+    "init_date": "20261013",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP96_20261013T12Z",
+    "filename": "WP96_20261013_12Z_gdm_wncv3.png",
+    "alt_filename": "WP96_20261013_12Z_gdm_wncv3.png",
+    "timestamp": "2026-10-13T23:07:11.158809+00:00"
   }
 ]
