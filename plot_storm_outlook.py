@@ -210,57 +210,99 @@ def build_unified_cone(df_storm, max_lead_hours=318, confidence_percentile=67):
         return None, pts_by_lead
 
 
+def classify_ensemble_track(t_df):
+    """
+    Classifies an individual ensemble member track into a meteorologically meaningful scenario:
+    Handles any trajectory across the Western North Pacific and Philippine Area of Responsibility (PAR):
+      - Westward landfall/passages:
+        * Northern passage: WESTWARD · LUZON STRAIT / BABUYAN (Batanes, Babuyan Islands, Bashi Channel)
+        * Northern/Central Luzon: WESTWARD · MAINLAND LUZON LANDFALL
+        * Southern Luzon / Bicol: WESTWARD · SOUTHERN LUZON / BICOL
+        * Visayas: WESTWARD · VISAYAS LANDFALL (Eastern & Central Visayas)
+        * Mindanao: WESTWARD · MINDANAO LANDFALL (Caraga, Davao, Northern Mindanao)
+      - Recurving trajectories (offshore curving north/northeast):
+        * RECURVE · EAST OF TAIWAN / RYUKYU (curves north east of Taiwan / Ryukyu / Miyako)
+        * RECURVE · S. JAPAN / OPEN PACIFIC (curves early in open ocean towards Japan / Pacific)
+        * RECURVE · PHILIPPINE SEA / S. JAPAN (curves north in central Philippine Sea)
+      - Dissipation:
+        * DISSIPATION · PHILIPPINE SEA (weakens offshore before landfall or recurve)
+    """
+    t_df = t_df.sort_values('lead_time_hours')
+    min_lon = float(t_df['lon'].min())
+    max_lat = float(t_df['lat'].max())
+    first_lat = float(t_df.iloc[0]['lat'])
+    last_lat = float(t_df.iloc[-1]['lat'])
+    last_lon = float(t_df.iloc[-1]['lon'])
+
+    min_lon_idx = t_df['lon'].idxmin()
+    lat_at_min_lon = float(t_df.loc[min_lon_idx, 'lat'])
+    delta_lon_turn = last_lon - min_lon
+
+    # Check for recurvature (turning north/northeastward away from Philippines/Asia):
+    # A) Recurve East of 131°E into the open Pacific towards S. Japan
+    if min_lon >= 131.0 and (last_lat >= 23.0 or max_lat >= 25.0 or delta_lon_turn >= 1.5):
+        return 'RECURVE · S. JAPAN / OPEN PACIFIC'
+
+    # B) Recurve East of Taiwan / Ryukyu (curves north near Taiwan/Ryukyu 121.5°E - 128.0°E, lat >= 18.0°N)
+    if 121.5 <= min_lon <= 128.0 and (delta_lon_turn >= 1.5 or last_lat >= 23.5) and lat_at_min_lon >= 18.0:
+        return 'RECURVE · EAST OF TAIWAN / RYUKYU'
+
+    # C) Recurve in Philippine Sea (curves north offshore between 127.0°E and 131.0°E)
+    if 127.0 <= min_lon < 131.0 and (delta_lon_turn >= 1.5 or last_lat >= 23.5):
+        return 'RECURVE · S. JAPAN / OPEN PACIFIC'
+
+    # D) Westward tracks crossing or approaching the Philippines:
+    near_ph = t_df[(t_df['lon'] >= 118.0) & (t_df['lon'] <= 126.0)]
+    if not near_ph.empty:
+        ph_lat = float(near_ph['lat'].mean())
+    else:
+        ph_lat = float(lat_at_min_lon)
+
+    if ph_lat >= 18.8:
+        return 'WESTWARD · LUZON STRAIT / BABUYAN'
+    elif ph_lat >= 14.5:
+        return 'WESTWARD · MAINLAND LUZON LANDFALL'
+    elif ph_lat >= 12.5:
+        return 'WESTWARD · SOUTHERN LUZON / BICOL'
+    elif ph_lat >= 9.0:
+        return 'WESTWARD · VISAYAS LANDFALL'
+    elif ph_lat < 9.0 and min_lon <= 130.0:
+        return 'WESTWARD · MINDANAO LANDFALL'
+    else:
+        if last_lat >= 23.0:
+            return 'RECURVE · S. JAPAN / OPEN PACIFIC'
+        return 'DISSIPATION · PHILIPPINE SEA'
+
+
 def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
     """
-    Clusters ensemble member tracks into distinct physical scenarios:
-    1. Westward · Luzon Strait / Babuyan Islands (northern sea passage)
-    2. Westward · Mainland Luzon Landfall (dense direct landfall over N./Central Luzon)
-    3. Recurve · S. Japan / Open Pacific (recurving northward into open ocean)
+    Dynamically categorizes ensemble member tracks across all potential scenarios,
+    and isolates strictly the top 3 most probable scenarios for display.
     """
+    from collections import defaultdict
+
     track_list = []
     for (tid, sid), t_df in df_storm.groupby(['track_id', 'sample']):
         t_df = t_df[t_df['lead_time_hours'] <= max_lead_hours].sort_values('lead_time_hours')
         if len(t_df) < 2:
             continue
 
-        # Check recurve vs westward
-        is_recurve = (t_df['lat'].max() >= 26.0 and t_df.loc[t_df['lat'] >= 26.0, 'lon'].min() >= 135.0) or \
-                     (t_df.iloc[-1]['lat'] >= 26.0 and t_df.iloc[-1]['lon'] >= 133.0)
-
-        near_ph = t_df[(t_df['lon'] >= 118.0) & (t_df['lon'] <= 126.0)]
-        if not near_ph.empty:
-            ph_lat = float(near_ph['lat'].mean())
-        else:
-            ph_lat = float(t_df.iloc[-1]['lat'])
-
+        cat = classify_ensemble_track(t_df)
         track_list.append({
             'tid': tid, 'sid': sid, 'df': t_df,
-            'is_recurve': is_recurve,
-            'ph_lat': ph_lat
+            'category': cat
         })
 
     if not track_list:
         return []
 
     total_tracked = len(track_list)
-    raw_groups = [
-        {
-            'name': 'WESTWARD · LUZON STRAIT / BABUYAN',
-            'tracks': [t for t in track_list if not t['is_recurve'] and t['ph_lat'] >= 18.5]
-        },
-        {
-            'name': 'WESTWARD · MAINLAND LUZON LANDFALL',
-            'tracks': [t for t in track_list if not t['is_recurve'] and t['ph_lat'] < 18.5]
-        },
-        {
-            'name': 'RECURVE · S. JAPAN',
-            'tracks': [t for t in track_list if t['is_recurve']]
-        }
-    ]
+    grouped_tracks = defaultdict(list)
+    for t in track_list:
+        grouped_tracks[t['category']].append(t)
 
-    clusters = []
-    for g in raw_groups:
-        c_tracks = g['tracks']
+    raw_clusters = []
+    for cat_name, c_tracks in grouped_tracks.items():
         if not c_tracks:
             continue
         count = len(c_tracks)
@@ -302,34 +344,40 @@ def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
                 ph_landfall_count += 1
         ph_landfall_pct = int(round((ph_landfall_count / count) * 100))
 
-        clusters.append({
+        raw_clusters.append({
             'count': count,
             'pct': pct,
-            'name': g['name'],
+            'name': cat_name,
             'tracks': c_tracks,
             'mean_df': mean_df,
             'peak_median_kt': peak_median_kt,
             'ph_landfall_pct': ph_landfall_pct
         })
 
-    # Filter out negligible noise clusters (< 3% share)
-    clusters = [c for c in clusters if c['pct'] >= 3.0]
-    if not clusters:
-        clusters = [track_list]
+    # Filter out negligible noise clusters (< 4% share or < 15 members)
+    # This guarantees that if only 2 distinct physical pathways exist (e.g. Taiwan & Japan),
+    # stray outlier tracks won't artificially generate an unwanted 3rd scenario.
+    significant_clusters = [c for c in raw_clusters if c['pct'] >= 4.0 or c['count'] >= 15]
+    if not significant_clusters:
+        significant_clusters = raw_clusters
 
-    # Sort descending by member percentage
-    clusters.sort(key=lambda c: c['count'], reverse=True)
+    # Sort descending by member count
+    significant_clusters.sort(key=lambda c: c['count'], reverse=True)
 
-    # Re-normalize percentages to 100% of tracked scenarios
+    # Strictly limit up to top 3 scenarios as requested
+    clusters = significant_clusters[:n_clusters]
+
+    # Re-normalize percentages to 100% of the active scenarios
     total_valid = sum(c['count'] for c in clusters)
-    for c in clusters:
-        c['pct'] = (c['count'] / total_valid) * 100.0
+    if total_valid > 0:
+        for c in clusters:
+            c['pct'] = (c['count'] / total_valid) * 100.0
 
     # Assign letters A, B, C and distinctive color theme
     palette = [
-        {'color': '#38bdf8', 'halo': '#0369a1'},  # Cyan (A - Luzon Strait / Babuyan)
-        {'color': '#4ade80', 'halo': '#166534'},  # Emerald / Lime (B - Direct Mainland Luzon Landfall)
-        {'color': '#f97316', 'halo': '#c2410c'},  # Vibrant Orange (C - Recurve S. Japan / Pacific)
+        {'color': '#38bdf8', 'halo': '#0369a1'},  # Cyan (Scenario A - Primary)
+        {'color': '#4ade80', 'halo': '#166534'},  # Emerald / Lime (Scenario B - Secondary)
+        {'color': '#f97316', 'halo': '#c2410c'},  # Vibrant Orange (Scenario C - Tertiary)
         {'color': '#e879f9', 'halo': '#86198f'},  # Fuchsia
     ]
 
@@ -537,8 +585,12 @@ def render_storm_outlook(
                         zorder=7.0, transform=ccrs.PlateCarree()
                     )
 
-                    # Text callout: alternate above/below based on scenario letter to avoid collisions
-                    y_off = 0.42 if letter in ['A', 'C'] else -0.55
+                    # Avoid cluttered duplicate date labels when member tracks are bundled together early on
+                    if h <= 144 and letter != 'A':
+                        continue
+
+                    # Distinct vertical offsets for post-divergence callouts
+                    y_off = 0.45 if letter == 'A' else (-0.55 if letter == 'B' else -0.65)
                     t_txt = ax_map.text(
                         nx + 0.35, ny + y_off, dt_label, color='#f8fafc',
                         fontsize=7.2, weight='bold', zorder=8.0, transform=ccrs.PlateCarree(),
