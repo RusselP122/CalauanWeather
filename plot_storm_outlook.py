@@ -142,8 +142,25 @@ def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
 
     matched_set = set(matched_groups)
     idx_filter = [key in matched_set for key in zip(df['track_id'], df['sample'])]
-    df_isolated = df[idx_filter].copy()
-    print(f"Isolated {len(matched_groups)} member tracks strictly for storm {target_storm_id}")
+    df_raw = df[idx_filter].copy()
+
+    # Ensure strictly 1 continuous track per ensemble member (sample):
+    # If a member has fragmented pieces (e.g. lead 0 invest stub and continued numeric ID),
+    # combine them into one unified, continuous track for that sample.
+    member_dfs = []
+    for sid, s_df in df_raw.groupby('sample'):
+        s_sorted = s_df.sort_values('lead_time_hours').drop_duplicates(subset=['lead_time_hours'])
+        rep_tid = s_sorted['track_id'].iloc[0]
+        s_sorted['track_id'] = rep_tid
+        member_dfs.append(s_sorted)
+
+    if member_dfs:
+        df_isolated = pd.concat(member_dfs, ignore_index=True)
+    else:
+        df_isolated = df_raw
+
+    n_members = df_isolated['sample'].nunique()
+    print(f"Isolated {n_members} member tracks strictly for storm {target_storm_id}")
     return df_isolated
 
 
@@ -215,7 +232,7 @@ def classify_ensemble_track(t_df):
     Classifies an individual ensemble member track into a meteorologically meaningful scenario:
     Handles any trajectory across the Western North Pacific and Philippine Area of Responsibility (PAR):
       - Westward landfall/passages:
-        * Northern passage: WESTWARD · LUZON STRAIT / BABUYAN (Batanes, Babuyan Islands, Bashi Channel)
+        * Northern passage: WESTWARD · TAIWAN / LUZON STRAIT (Batanes, Babuyan Islands, Taiwan, Bashi Channel)
         * Northern/Central Luzon: WESTWARD · MAINLAND LUZON LANDFALL
         * Southern Luzon / Bicol: WESTWARD · SOUTHERN LUZON / BICOL
         * Visayas: WESTWARD · VISAYAS LANDFALL (Eastern & Central Visayas)
@@ -259,7 +276,7 @@ def classify_ensemble_track(t_df):
         ph_lat = float(lat_at_min_lon)
 
     if ph_lat >= 18.8:
-        return 'WESTWARD · LUZON STRAIT / BABUYAN'
+        return 'WESTWARD · TAIWAN / LUZON STRAIT'
     elif ph_lat >= 14.5:
         return 'WESTWARD · MAINLAND LUZON LANDFALL'
     elif ph_lat >= 12.5:
