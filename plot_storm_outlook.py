@@ -229,20 +229,40 @@ def build_unified_cone(df_storm, max_lead_hours=318, confidence_percentile=67):
 
 def classify_ensemble_track(t_df):
     """
-    Classifies an individual ensemble member track into a meteorologically meaningful scenario:
-    Handles any trajectory across the Western North Pacific and Philippine Area of Responsibility (PAR):
-      - Westward landfall/passages:
-        * Northern passage: WESTWARD · TAIWAN / LUZON STRAIT (Batanes, Babuyan Islands, Taiwan, Bashi Channel)
-        * Northern/Central Luzon: WESTWARD · MAINLAND LUZON LANDFALL
-        * Southern Luzon / Bicol: WESTWARD · SOUTHERN LUZON / BICOL
-        * Visayas: WESTWARD · VISAYAS LANDFALL (Eastern & Central Visayas)
-        * Mindanao: WESTWARD · MINDANAO LANDFALL (Caraga, Davao, Northern Mindanao)
-      - Recurving trajectories (offshore curving north/northeast):
-        * RECURVE · EAST OF TAIWAN / RYUKYU (curves north east of Taiwan / Ryukyu / Miyako)
-        * RECURVE · S. JAPAN / OPEN PACIFIC (curves early in open ocean towards Japan / Pacific)
-        * RECURVE · PHILIPPINE SEA / S. JAPAN (curves north in central Philippine Sea)
-      - Dissipation:
-        * DISSIPATION · PHILIPPINE SEA (weakens offshore before landfall or recurve)
+    Classifies an individual ensemble member track into a meteorologically meaningful,
+    geographically precise scenario covering the Western North Pacific, PAR, and South China Sea:
+      - Luzon Landfalls & Passages:
+        * LANDFALL · BICOL REGION / CATANDUANES (Catanduanes, Albay, Sorsogon, Camarines Sur/Norte)
+        * LANDFALL · AURORA / QUEZON / POLILLO (Aurora, Northern/Southern Quezon, Polillo Islands)
+        * LANDFALL · CAGAYAN / ISABELA / N. LUZON (Cagayan, Isabela, Northern Luzon)
+        * LANDFALL · TAIWAN / LUZON STRAIT (Batanes, Babuyan Islands, Taiwan, Bashi Channel)
+        * LANDFALL · CENTRAL LUZON / W. LUZON (Pangasinan, Zambales, Bataan, Metro Manila, Cavite)
+        * LANDFALL · S. TAGALOG / MINDORO / MIMAROPA (Batangas, Mindoro, Marinduque, Romblon)
+        * CROSSES LUZON · SOUTH CHINA SEA (crosses Luzon landmass into West Philippine Sea / SCS)
+        * CROSSES LUZON · HAINAN / GUANGDONG (crosses Luzon continuing toward Hainan / Guangdong)
+        * CROSSES LUZON · VIETNAM (crosses Luzon continuing toward Vietnam)
+      - Visayas Landfalls & Passages:
+        * LANDFALL · EASTERN SAMAR / LEYTE (Eastern Samar, Northern Samar, Samar, Leyte, Biliran)
+        * LANDFALL · CENTRAL / WESTERN VISAYAS (Cebu, Bohol, Negros, Panay, Guimaras, Siquijor)
+        * CROSSES VISAYAS · SULU SEA / SCS (crosses Visayas into Sulu Sea / South China Sea)
+      - Mindanao Landfalls & Passages:
+        * LANDFALL · DINAGAT / SIARGAO / SURIGAO (Dinagat Islands, Siargao, Surigao del Norte/Sur)
+        * LANDFALL · DAVAO / CENTRAL MINDANAO (Davao, Bukidnon, Misamis, Cotabato, Sarangani, Zamboanga)
+        * CROSSES MINDANAO · SULU SEA (crosses Mindanao into Sulu Sea / Celebes Sea)
+      - Recurvature Trajectories:
+        * RECURVE · EAST OF TAIWAN / RYUKYU (curves north near Taiwan / Ryukyu / Miyako / Okinawa)
+        * RECURVE · S. JAPAN / OPEN PACIFIC (curves north/northeast east of 128°E into open Pacific / Japan)
+        * RECURVE · PHILIPPINE SEA (curves north in central Philippine Sea, staying offshore of PH)
+      - West of Philippines & South China Sea Passages:
+        * PASSES WEST OF LUZON · W. PHILIPPINE SEA (tracks northward offshore west of Ilocos/Zambales)
+        * RECURVE · WEST OF LUZON / SCS (recurves north/northeast over SCS toward Taiwan / Luzon Strait)
+        * PASSES PALAWAN · SULU SEA / SCS (tracks near Palawan / Sulu Sea)
+        * WESTWARD · HAINAN / GUANGDONG (direct entry into SCS toward Hainan / Guangdong / Hong Kong)
+        * WESTWARD · VIETNAM / S. CHINA SEA (tracks across SCS toward Vietnam)
+        * WESTWARD · S. CHINA SEA / SPRATLYS (tracks across central/southern SCS near Spratlys)
+      - Offshore / Dissipation:
+        * OFFSHORE · EAST OF PHILIPPINES (stays offshore east of the archipelago)
+        * DISSIPATION · PHILIPPINE SEA (weakens/dissipates offshore over open waters)
     """
     t_df = t_df.sort_values('lead_time_hours')
     min_lon = float(t_df['lon'].min())
@@ -255,40 +275,148 @@ def classify_ensemble_track(t_df):
     lat_at_min_lon = float(t_df.loc[min_lon_idx, 'lat'])
     delta_lon_turn = last_lon - min_lon
 
-    # Check for recurvature (turning north/northeastward away from Philippines/Asia):
-    # A) Recurve East of 131°E into the open Pacific towards S. Japan
-    if min_lon >= 131.0 and (last_lat >= 23.0 or max_lat >= 25.0 or delta_lon_turn >= 1.5):
+    # Check landfall/approach coordinates across Philippine regional domains:
+    # 1. Bicol / Catanduanes: lat 12.3 to 14.4, lon 122.5 to 125.0
+    bicol_pts = t_df[(t_df['lat'] >= 12.3) & (t_df['lat'] < 14.4) & (t_df['lon'] >= 122.5) & (t_df['lon'] <= 125.0)]
+    # 2. Aurora / Quezon / Polillo: lat 14.4 to 16.5, lon 121.3 to 123.5
+    aurora_pts = t_df[(t_df['lat'] >= 14.4) & (t_df['lat'] < 16.5) & (t_df['lon'] >= 121.3) & (t_df['lon'] <= 123.5)]
+    # 3. Cagayan / Isabela / N. Luzon: lat 16.5 to 18.8, lon 121.2 to 123.5
+    nluzon_pts = t_df[(t_df['lat'] >= 16.5) & (t_df['lat'] < 18.8) & (t_df['lon'] >= 121.2) & (t_df['lon'] <= 123.5)]
+    # 4. Taiwan / Luzon Strait (Babuyan, Batanes, Taiwan, Bashi Channel): lat 18.8 to 25.5, lon 119.5 to 124.0
+    taiwan_strait_pts = t_df[(t_df['lat'] >= 18.8) & (t_df['lat'] <= 25.5) & (t_df['lon'] >= 119.5) & (t_df['lon'] <= 124.0)]
+    # 5. Central Luzon / Western Luzon: lat 14.5 to 18.5, lon 119.5 to 121.2
+    wluzon_pts = t_df[(t_df['lat'] >= 14.5) & (t_df['lat'] < 18.5) & (t_df['lon'] >= 119.5) & (t_df['lon'] <= 121.2)]
+    # 6. Southern Tagalog / Mindoro / MIMAROPA: lat 12.0 to 14.5, lon 120.0 to 122.3
+    mimaropa_pts = t_df[(t_df['lat'] >= 12.0) & (t_df['lat'] < 14.5) & (t_df['lon'] >= 120.0) & (t_df['lon'] <= 122.3)]
+    # 7. Eastern Samar / Leyte (Eastern Visayas): lat 9.8 to 12.5, lon 124.0 to 126.5
+    evisayas_pts = t_df[(t_df['lat'] >= 9.8) & (t_df['lat'] < 12.5) & (t_df['lon'] >= 124.0) & (t_df['lon'] <= 126.5)]
+    # 8. Central & Western Visayas: lat 9.0 to 12.0, lon 122.0 to 124.2
+    wvisayas_pts = t_df[(t_df['lat'] >= 9.0) & (t_df['lat'] < 12.0) & (t_df['lon'] >= 122.0) & (t_df['lon'] <= 124.2)]
+    # 9. Dinagat / Siargao / Surigao (NE Mindanao / Caraga): lat 8.5 to 10.5, lon 125.0 to 126.8
+    caraga_pts = t_df[(t_df['lat'] >= 8.5) & (t_df['lat'] < 10.5) & (t_df['lon'] >= 125.0) & (t_df['lon'] <= 126.8)]
+    # 10. Davao / Central / Southern Mindanao: lat 5.0 to 8.5, lon 121.5 to 126.8
+    smindanao_pts = t_df[(t_df['lat'] >= 5.0) & (t_df['lat'] < 8.5) & (t_df['lon'] >= 121.5) & (t_df['lon'] <= 126.8)]
+
+    # Check for entry into South China Sea / West Philippine Sea (lon <= 119.5):
+    into_scs = t_df[t_df['lon'] <= 119.5]
+
+    # ─────────────────────────────────────────────────────────────
+    # A. RECURVING TRACKS (Turning North/Northeast into Pacific)
+    # ─────────────────────────────────────────────────────────────
+    # 1. Open Pacific / South Japan: min_lon >= 128.5 and recurves north/northeast
+    if min_lon >= 128.5 and (last_lat >= 23.0 or max_lat >= 25.0 or delta_lon_turn >= 1.5):
         return 'RECURVE · S. JAPAN / OPEN PACIFIC'
 
-    # B) Recurve East of Taiwan / Ryukyu (curves north near Taiwan/Ryukyu 121.5°E - 128.0°E, lat >= 18.0°N)
-    if 121.5 <= min_lon <= 128.0 and (delta_lon_turn >= 1.5 or last_lat >= 23.5) and lat_at_min_lon >= 18.0:
+    # 2. Recurve East of Taiwan / Ryukyu (curves north near Taiwan/Ryukyu 121.5°E - 128.5°E, lat >= 18.5°N)
+    if 121.5 <= min_lon <= 128.5 and (delta_lon_turn >= 1.5 or last_lat >= 23.5) and lat_at_min_lon >= 18.5:
+        if min_lon >= 126.5 and last_lat >= 25.0:
+            return 'RECURVE · S. JAPAN / OPEN PACIFIC'
         return 'RECURVE · EAST OF TAIWAN / RYUKYU'
 
-    # C) Recurve in Philippine Sea (curves north offshore between 127.0°E and 131.0°E)
-    if 127.0 <= min_lon < 131.0 and (delta_lon_turn >= 1.5 or last_lat >= 23.5):
+    # 3. Recurve in Philippine Sea (lat < 18.5, but curves north/northeast offshore east of 126.5°E)
+    if min_lon >= 126.5 and (delta_lon_turn >= 2.0 or last_lat >= 23.0):
+        return 'RECURVE · PHILIPPINE SEA'
+
+    # ─────────────────────────────────────────────────────────────
+    # B. TRACKS CROSSING LUZON OR VISAYAS INTO SOUTH CHINA SEA
+    # ─────────────────────────────────────────────────────────────
+    if not into_scs.empty:
+        # Came from Luzon landfall:
+        if not (nluzon_pts.empty and aurora_pts.empty and bicol_pts.empty):
+            scs_end_lat = float(into_scs.iloc[-1]['lat'])
+            scs_end_lon = float(into_scs.iloc[-1]['lon'])
+            if scs_end_lon <= 111.0:
+                return 'CROSSES LUZON · VIETNAM'
+            elif scs_end_lat >= 19.0:
+                return 'CROSSES LUZON · HAINAN / GUANGDONG'
+            else:
+                return 'CROSSES LUZON · SOUTH CHINA SEA'
+        elif not evisayas_pts.empty or not wvisayas_pts.empty:
+            return 'CROSSES VISAYAS · SULU SEA / SCS'
+        elif not caraga_pts.empty or not smindanao_pts.empty:
+            return 'CROSSES MINDANAO · SULU SEA'
+
+    # ─────────────────────────────────────────────────────────────
+    # C. DIRECT REGIONAL LANDFALL & PASSAGE CATEGORIES
+    # ─────────────────────────────────────────────────────────────
+    # 1. Taiwan / Luzon Strait / Batanes / Babuyan
+    if not taiwan_strait_pts.empty or (lat_at_min_lon >= 18.8 and min_lon <= 123.0):
+        if min_lon <= 113.5 and last_lat <= 22.5:
+            return 'WESTWARD · HAINAN / GUANGDONG'
+        return 'LANDFALL · TAIWAN / LUZON STRAIT'
+
+    # 2. Northern Luzon (Cagayan / Isabela)
+    if not nluzon_pts.empty or (16.5 <= lat_at_min_lon < 18.8 and min_lon <= 123.5):
+        return 'LANDFALL · CAGAYAN / ISABELA / N. LUZON'
+
+    # 3. Central Eastern Luzon (Aurora / Quezon / Polillo)
+    if not aurora_pts.empty or (14.4 <= lat_at_min_lon < 16.5 and min_lon <= 123.5):
+        return 'LANDFALL · AURORA / QUEZON / POLILLO'
+
+    # 4. Bicol Region / Catanduanes
+    if not bicol_pts.empty or (12.3 <= lat_at_min_lon < 14.4 and min_lon <= 125.0):
+        return 'LANDFALL · BICOL REGION / CATANDUANES'
+
+    # 5. Southern Tagalog / Mindoro / Northern MIMAROPA
+    if not mimaropa_pts.empty or (12.0 <= lat_at_min_lon < 14.5 and min_lon <= 122.3):
+        return 'LANDFALL · S. LUZON / MINDORO / MIMAROPA'
+
+    # 6. Central & Western Luzon
+    if not wluzon_pts.empty:
+        return 'LANDFALL · CENTRAL LUZON / W. LUZON'
+
+    # 7. Eastern Visayas (Samar / Leyte)
+    if not evisayas_pts.empty or (9.8 <= lat_at_min_lon < 12.3 and min_lon <= 126.5):
+        return 'LANDFALL · EASTERN SAMAR / LEYTE'
+
+    # 8. Central & Western Visayas (Cebu / Panay / Negros / Bohol)
+    if not wvisayas_pts.empty or (9.0 <= lat_at_min_lon < 12.0 and min_lon <= 124.0):
+        return 'LANDFALL · CENTRAL / WESTERN VISAYAS'
+
+    # 9. Dinagat / Siargao / Surigao (Caraga / NE Mindanao)
+    if not caraga_pts.empty or (8.5 <= lat_at_min_lon < 9.8 and min_lon <= 126.8):
+        return 'LANDFALL · DINAGAT / SIARGAO / SURIGAO'
+
+    # 10. Southern / Central Mindanao (Davao / Cotabato / Zamboanga)
+    if not smindanao_pts.empty or (lat_at_min_lon < 8.5 and min_lon <= 127.0):
+        return 'LANDFALL · DAVAO / CENTRAL MINDANAO'
+
+    # 11. Scenarios for Storms West of the Philippines (West Philippine Sea / South China Sea)
+    if not into_scs.empty or min_lon <= 120.0:
+        scs_end_lat = float(into_scs.iloc[-1]['lat']) if not into_scs.empty else lat_at_min_lon
+        scs_end_lon = float(into_scs.iloc[-1]['lon']) if not into_scs.empty else min_lon
+
+        # A) Recurvature in South China Sea / West of Luzon (turns north/northeast toward Taiwan or Luzon Strait)
+        if min_lon <= 119.5 and delta_lon_turn >= 1.5 and last_lat >= 19.5:
+            return 'RECURVE · WPS / SCS'
+
+        # B) Passes West of Luzon offshore (tracks northward in West Philippine Sea without hitting land)
+        if 116.5 <= min_lon <= 120.2 and 14.5 <= lat_at_min_lon <= 19.5 and last_lat >= 19.0 and delta_lon_turn < 1.5:
+            return 'PASSES WEST OF LUZON · W. PHILIPPINE SEA'
+
+        # C) Passes Palawan or Sulu Sea
+        if 7.0 <= lat_at_min_lon <= 12.0 and min_lon <= 119.8:
+            return 'PASSES PALAWAN · SULU SEA / SCS'
+
+        # D) Westward toward Vietnam
+        if scs_end_lon <= 111.5:
+            return 'WESTWARD · VIETNAM / S. CHINA SEA'
+
+        # E) Westward toward Hainan Island / Guangdong / Hong Kong
+        if scs_end_lat >= 18.0:
+            return 'WESTWARD · HAINAN / GUANGDONG'
+
+        # F) Central South China Sea / Spratlys
+        return 'WESTWARD · S. CHINA SEA / SPRATLYS'
+
+    # ─────────────────────────────────────────────────────────────
+    # D. OFFSHORE APPROACH & DISSIPATION
+    # ─────────────────────────────────────────────────────────────
+    if last_lat >= 23.0 or max_lat >= 24.5:
         return 'RECURVE · S. JAPAN / OPEN PACIFIC'
-
-    # D) Westward tracks crossing or approaching the Philippines:
-    near_ph = t_df[(t_df['lon'] >= 118.0) & (t_df['lon'] <= 126.0)]
-    if not near_ph.empty:
-        ph_lat = float(near_ph['lat'].mean())
-    else:
-        ph_lat = float(lat_at_min_lon)
-
-    if ph_lat >= 18.8:
-        return 'WESTWARD · TAIWAN / LUZON STRAIT'
-    elif ph_lat >= 14.5:
-        return 'WESTWARD · MAINLAND LUZON LANDFALL'
-    elif ph_lat >= 12.5:
-        return 'WESTWARD · SOUTHERN LUZON / BICOL'
-    elif ph_lat >= 9.0:
-        return 'WESTWARD · VISAYAS LANDFALL'
-    elif ph_lat < 9.0 and min_lon <= 130.0:
-        return 'WESTWARD · MINDANAO LANDFALL'
-    else:
-        if last_lat >= 23.0:
-            return 'RECURVE · S. JAPAN / OPEN PACIFIC'
-        return 'DISSIPATION · PHILIPPINE SEA'
+    if min_lon <= 127.0:
+        return 'OFFSHORE · EAST OF PHILIPPINES'
+    return 'DISSIPATION · PHILIPPINE SEA'
 
 
 def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
@@ -717,10 +845,17 @@ def render_storm_outlook(
             bbox=dict(boxstyle='circle,pad=0.25', facecolor=sc_col, edgecolor='#ffffff', linewidth=1.0)
         )
 
-        # Scenario Name
+        # Scenario Name with responsive font sizing
+        if len(sc['name']) > 34:
+            name_font_size = 7.0
+        elif len(sc['name']) > 28:
+            name_font_size = 7.6
+        else:
+            name_font_size = 8.2
+
         ax_hud.text(
             0.17, y_pos + 0.035, sc['name'],
-            fontsize=8.0, weight='heavy', color='#f1f5f9', va='center'
+            fontsize=name_font_size, weight='heavy', color='#f1f5f9', va='center'
         )
 
         # Percentage
