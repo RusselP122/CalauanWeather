@@ -861,7 +861,7 @@
     "filename": "MONITORING_LPA01_20261016_06Z_gdm_wncv3.png",
     "alt_filename": "MONITORING_LPA01_20261016_06Z_gdm_wncv3.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:22:57.562523+00:00"
+    "timestamp": "2026-10-16T17:00:23.973366+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -873,7 +873,7 @@
     "filename": "MONITORING_LPA02_20261016_06Z_gdm_wncv3.png",
     "alt_filename": "MONITORING_LPA02_20261016_06Z_gdm_wncv3.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:22:59.156878+00:00"
+    "timestamp": "2026-10-16T17:00:25.605407+00:00"
   },
   {
     "storm_id": "MONITORING_LPA01",
@@ -885,7 +885,7 @@
     "filename": "MONITORING_LPA01_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:23:58.594768+00:00"
+    "timestamp": "2026-10-16T17:01:26.040622+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -897,7 +897,7 @@
     "filename": "MONITORING_LPA02_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:06.105723+00:00"
+    "timestamp": "2026-10-16T17:01:33.635279+00:00"
   },
   {
     "storm_id": "MONITORING_LPA07",
@@ -909,7 +909,7 @@
     "filename": "MONITORING_LPA07_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA07_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:08.097793+00:00"
+    "timestamp": "2026-10-16T17:01:35.636611+00:00"
   },
   {
     "storm_id": "MONITORING_LPA03",
@@ -921,7 +921,7 @@
     "filename": "MONITORING_LPA03_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA03_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:11.655883+00:00"
+    "timestamp": "2026-10-16T17:01:39.169778+00:00"
   },
   {
     "storm_id": "MONITORING_LPA04",
@@ -933,7 +933,7 @@
     "filename": "MONITORING_LPA04_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA04_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:13.916005+00:00"
+    "timestamp": "2026-10-16T17:01:41.430345+00:00"
   },
   {
     "storm_id": "MONITORING_LPA08",
@@ -945,7 +945,7 @@
     "filename": "MONITORING_LPA08_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA08_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:15.753291+00:00"
+    "timestamp": "2026-10-16T17:01:43.255173+00:00"
   },
   {
     "storm_id": "MONITORING_LPA06",
@@ -957,7 +957,7 @@
     "filename": "MONITORING_LPA06_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA06_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:17.640063+00:00"
+    "timestamp": "2026-10-16T17:01:45.133674+00:00"
   },
   {
     "storm_id": "MONITORING_LPA05",
@@ -969,7 +969,7 @@
     "filename": "MONITORING_LPA05_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA05_20261016_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T14:24:20.015889+00:00"
+    "timestamp": "2026-10-16T17:01:47.493493+00:00"
   },
   {
     "storm_id": "WP29",
@@ -980,7 +980,7 @@
     "unique_key": "WP29_20261016T06Z",
     "filename": "WP29_20261016_06Z_gdm_wncv3.png",
     "alt_filename": "WP29_20261016_06Z_gdm_wncv3.png",
-    "timestamp": "2026-10-16T14:24:25.557819+00:00"
+    "timestamp": "2026-10-16T17:01:53.466450+00:00"
   },
   {
     "storm_id": "WP29",
@@ -991,6 +991,6 @@
     "unique_key": "WP29_20261016T06Z",
     "filename": "WP29_20261016_06Z_gdm_wnc_large.png",
     "alt_filename": "WP29_20261016_06Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-16T14:25:08.780750+00:00"
+    "timestamp": "2026-10-16T17:02:36.358669+00:00"
   }
 ]
