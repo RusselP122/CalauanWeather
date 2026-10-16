@@ -907,7 +907,7 @@
     "filename": "MONITORING_LPA01_20261016_00Z_gdm_wncv3.png",
     "alt_filename": "MONITORING_LPA01_20261016_00Z_gdm_wncv3.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T08:03:34.996966+00:00"
+    "timestamp": "2026-10-16T11:49:06.323443+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -919,7 +919,7 @@
     "filename": "MONITORING_LPA02_20261016_00Z_gdm_wncv3.png",
     "alt_filename": "MONITORING_LPA02_20261016_00Z_gdm_wncv3.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T08:03:35.885800+00:00"
+    "timestamp": "2026-10-16T11:49:07.789119+00:00"
   },
   {
     "storm_id": "MONITORING_LPA01",
@@ -931,7 +931,7 @@
     "filename": "MONITORING_LPA01_20261016_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261016_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T08:04:14.031052+00:00"
+    "timestamp": "2026-10-16T11:50:17.997791+00:00"
   },
   {
     "storm_id": "MONITORING_LPA03",
@@ -943,7 +943,7 @@
     "filename": "MONITORING_LPA03_20261016_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA03_20261016_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T08:04:15.485743+00:00"
+    "timestamp": "2026-10-16T11:50:20.540245+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -955,7 +955,7 @@
     "filename": "MONITORING_LPA02_20261016_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261016_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T08:04:18.880575+00:00"
+    "timestamp": "2026-10-16T11:50:26.582233+00:00"
   },
   {
     "storm_id": "MONITORING_LPA04",
@@ -967,7 +967,7 @@
     "filename": "MONITORING_LPA04_20261016_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA04_20261016_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-16T08:04:20.360899+00:00"
+    "timestamp": "2026-10-16T11:50:29.195915+00:00"
   },
   {
     "storm_id": "WP29",
@@ -978,7 +978,7 @@
     "unique_key": "WP29_20261016T00Z",
     "filename": "WP29_20261016_00Z_gdm_wncv3.png",
     "alt_filename": "WP29_20261016_00Z_gdm_wncv3.png",
-    "timestamp": "2026-10-16T08:04:24.137713+00:00"
+    "timestamp": "2026-10-16T11:50:34.924982+00:00"
   },
   {
     "storm_id": "WP29",
@@ -989,6 +989,6 @@
     "unique_key": "WP29_20261016T00Z",
     "filename": "WP29_20261016_00Z_gdm_wnc_large.png",
     "alt_filename": "WP29_20261016_00Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-16T08:04:47.863985+00:00"
+    "timestamp": "2026-10-16T11:51:18.595901+00:00"
   }
 ]
