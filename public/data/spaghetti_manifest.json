@@ -669,7 +669,7 @@
     "filename": "MONITORING_LPA01_20261018_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261018_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-18T08:23:16.708059+00:00"
+    "timestamp": "2026-10-18T11:35:55.897505+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -681,7 +681,7 @@
     "filename": "MONITORING_LPA02_20261018_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261018_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-18T08:23:22.400871+00:00"
+    "timestamp": "2026-10-18T11:36:04.773110+00:00"
   },
   {
     "storm_id": "MONITORING_LPA03",
@@ -693,7 +693,7 @@
     "filename": "MONITORING_LPA03_20261018_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA03_20261018_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-18T08:23:24.264087+00:00"
+    "timestamp": "2026-10-18T11:36:07.542307+00:00"
   },
   {
     "storm_id": "WP29",
@@ -704,6 +704,41 @@
     "unique_key": "WP29_20261018T00Z",
     "filename": "WP29_20261018_00Z_gdm_wnc_large.png",
     "alt_filename": "WP29_20261018_00Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-18T08:23:52.387635+00:00"
+    "timestamp": "2026-10-18T11:36:50.519869+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261018",
+    "cycle": "00Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA01_20261018T00Z",
+    "filename": "MONITORING_LPA01_20261018_00Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA01_20261018_00Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-18T11:34:47.025207+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261018",
+    "cycle": "00Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA02_20261018T00Z",
+    "filename": "MONITORING_LPA02_20261018_00Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA02_20261018_00Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-10-18T11:34:48.681067+00:00"
+  },
+  {
+    "storm_id": "WP29",
+    "atcf_id": "29W",
+    "init_date": "20261018",
+    "cycle": "00Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP29_20261018T00Z",
+    "filename": "WP29_20261018_00Z_gdm_wncv3.png",
+    "alt_filename": "WP29_20261018_00Z_gdm_wncv3.png",
+    "timestamp": "2026-10-18T11:36:12.707111+00:00"
   }
 ]
