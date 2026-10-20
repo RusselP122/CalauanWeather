@@ -1182,9 +1182,18 @@ def plot_monitoring_tracks(
     elif 148.0 < mean_gen_lon <= 158.0 and 11.5 <= mean_gen_lat <= 25.0:
         region_name = "EAST OF MARIANAS"
         region_friendly = "east of the Marianas"
-    elif 143.0 < mean_gen_lon <= 152.0 and 3.0 <= mean_gen_lat < 11.5:
+    elif 143.0 < mean_gen_lon <= 150.0 and 3.0 <= mean_gen_lat < 11.5:
         region_name = "CAROLINE ISLANDS"
         region_friendly = "in the Caroline Islands"
+    elif 150.0 < mean_gen_lon <= 161.0 and 3.0 <= mean_gen_lat <= 16.0:
+        region_name = "MICRONESIA"
+        region_friendly = "in Micronesia"
+    elif 161.0 < mean_gen_lon <= 176.0 and 3.0 <= mean_gen_lat <= 20.0:
+        region_name = "MARSHALL ISLANDS"
+        region_friendly = "in the Marshall Islands"
+    elif mean_gen_lon > 176.0 and mean_gen_lat <= 20.0:
+        region_name = "EAST OF MARSHALL ISLANDS"
+        region_friendly = "east of the Marshall Islands"
     elif mean_gen_lon >= 152.0 and mean_gen_lat <= 20.0:
         region_name = "EASTERN CAROLINE"
         region_friendly = "in Eastern Caroline Islands"
@@ -1671,60 +1680,304 @@ def plot_monitoring_tracks(
     card_x = 0.640
     card_w = 0.325
 
-    # Card 1: Summary Box (Comfortable padding, generous spacing)
-    card1_bottom = 0.675
-    card1_h = 0.235
+    # Card 1: Modern Development Probability & Intensity Breakdown Card
+    # Card 1: Modern Development Probability & Intensity Breakdown Card
+    card1_bottom = 0.670
+    card1_h = 0.240
     ax_card1 = fig.add_axes([card_x, card1_bottom, card_w, card1_h])
-    ax_card1.set_facecolor('#0d121c')
+    ax_card1.set_facecolor('none')
+    ax_card1.set_xlim(0.0, 1.0)
+    ax_card1.set_ylim(0.0, 1.0)
     ax_card1.set_xticks([])
     ax_card1.set_yticks([])
     for spine in ax_card1.spines.values():
-        spine.set_edgecolor('#222d3d')
-        spine.set_linewidth(1.0)
+        spine.set_visible(False)
+
+    # Sleek rounded card container frame
+    card_bg = mpatches.FancyBboxPatch(
+        (0.0, 0.0), 1.0, 1.0,
+        boxstyle='round,pad=-0.004,rounding_size=0.045',
+        facecolor='#0b111d', edgecolor='#1e293b', linewidth=1.1,
+        transform=ax_card1.transAxes, zorder=0
+    )
+    ax_card1.add_patch(card_bg)
+
+    # 1. Top Sub-header: Clean Region Name
+    region_display = region_friendly.strip()
+    if region_display.startswith("in the "):
+        region_display = region_display[7:]
+    elif region_display.startswith("in "):
+        region_display = region_display[3:]
+    elif region_display.startswith("near the "):
+        region_display = region_display[9:]
+    elif region_display.startswith("near "):
+        region_display = region_display[5:]
+    elif region_display.startswith("east of the "):
+        region_display = "East of the " + region_display[12:]
+    elif region_display.startswith("east of "):
+        region_display = "East of " + region_display[8:]
+    elif region_display.startswith("west of the "):
+        region_display = "West of the " + region_display[12:]
+    elif region_display.startswith("west of "):
+        region_display = "West of " + region_display[8:]
+    else:
+        region_display = region_name.title()
 
     ax_card1.text(
-        0.06, 0.90, f"{dev_full_pct}% OF MEMBERS",
-        fontsize=24, weight='heavy', color='#ffffff', fontfamily='sans-serif', va='top'
-    )
-    ax_card1.text(
-        0.06, 0.70, f"({cluster_members} OF {total_ensemble_members} MEMBERS · FULL RUN TO {end_run_str})",
-        fontsize=9.2, weight='bold', color='#38bdf8', fontfamily='monospace', va='top'
-    )
-    ax_card1.text(
-        0.06, 0.52, f"of members develop a tropical cyclone\n{region_friendly}",
-        fontsize=9.0, weight='bold', color='#cbd5e1', fontfamily='sans-serif', va='top'
-    )
-    ax_card1.text(
-        0.06, 0.30, f"PEAK GENESIS WINDOW: {peak_window_str}",
-        fontsize=8.5, weight='bold', color='#94a3b8', fontfamily='monospace', va='top'
-    )
-    ax_card1.text(
-        0.06, 0.16, f"{ts_count} OF {total_ensemble_members} ({ts_pct}%) REACH TS  ·  {ty_count} TYPHOON  ·  {major_count} MAJOR",
-        fontsize=8.0, weight='bold', color='#e2e8f0', fontfamily='monospace', va='top'
+        0.055, 0.935, region_display,
+        fontsize=9.6, color='#94a3b8', fontfamily='sans-serif',
+        weight='normal', va='top', ha='left', zorder=2
     )
 
-    # Card 2: Intensity Plume (True Date Axis, Clear Top Gap)
-    card2_bottom = 0.365
-    card2_h = 0.245
-    ax_card2 = fig.add_axes([card_x, card2_bottom, card_w, card2_h])
-    ax_card2.set_facecolor('#0a0e17')
+    # 2. Big Percentage & Main Statement
+    ax_card1.text(
+        0.055, 0.770, f"{dev_full_pct}%",
+        fontsize=34, weight='bold', color='#ffffff', fontfamily='sans-serif',
+        va='center', ha='left', zorder=2
+    )
+    if dev_full_pct >= 100:
+        pct_text_x = 0.34
+    elif dev_full_pct >= 10:
+        pct_text_x = 0.285
+    else:
+        pct_text_x = 0.22
+    ax_card1.text(
+        pct_text_x, 0.770, "of ensemble members develop\na tropical cyclone",
+        fontsize=9.2, weight='normal', color='#e2e8f0', fontfamily='sans-serif',
+        linespacing=1.2, va='center', ha='left', zorder=2
+    )
+
+    # 3. Member Count Subtitle
+    end_run_display = f"{end_run_dt.strftime('%b')} {end_run_dt.day}"
+    ax_card1.text(
+        0.055, 0.635, f"{cluster_members} of {total_ensemble_members:,} members · full run to {end_run_display}",
+        fontsize=8.6, color='#94a3b8', fontfamily='sans-serif',
+        weight='normal', va='center', ha='left'
+    )
+
+    # 4. Pill Badge: Peak genesis window
+    if gen_start_dt.strftime('%b') == gen_end_dt.strftime('%b'):
+        peak_pill_dates = f"{gen_start_dt.strftime('%b')} {gen_start_dt.day}–{gen_end_dt.day}"
+    else:
+        peak_pill_dates = f"{gen_start_dt.strftime('%b')} {gen_start_dt.day} – {gen_end_dt.strftime('%b')} {gen_end_dt.day}"
+    pill_label = f"Peak genesis window · {peak_pill_dates}"
+
+    ax_card1.text(
+        0.055, 0.525, pill_label,
+        fontsize=8.0, weight='medium', color='#cbd5e1', fontfamily='sans-serif',
+        va='center', ha='left',
+        bbox=dict(
+            boxstyle='round,pad=0.38,rounding_size=0.55',
+            facecolor='#101928', edgecolor='#233247', linewidth=0.9
+        )
+    )
+
+    # 5. Horizontal Divider Line
+    ax_card1.plot([0.055, 0.945], [0.420, 0.420], color='#1e293b', linewidth=1.0)
+
+    # 6. Three Intensity Tier Sub-Cards / Tiles
+    tiles = [
+        {
+            'label': 'Reach TS',
+            'pct': ts_pct,
+            'count': ts_count,
+            'color': '#38bdf8'  # Cyan
+        },
+        {
+            'label': 'Typhoon',
+            'pct': ty_pct,
+            'count': ty_count,
+            'color': '#f59e0b'  # Amber / Orange
+        },
+        {
+            'label': 'Major',
+            'pct': major_pct,
+            'count': major_count,
+            'color': '#ef4444'  # Red / Coral
+        }
+    ]
+
+    tile_w = 0.276
+    gap = 0.031
+    tile_bottom = 0.055
+    tile_h = 0.315
+
+    for idx, tile in enumerate(tiles):
+        tile_x = 0.055 + idx * (tile_w + gap)
+
+        # Tile rounded background box
+        tile_rect = mpatches.FancyBboxPatch(
+            (tile_x, tile_bottom), tile_w, tile_h,
+            boxstyle='round,pad=0.012,rounding_size=0.045',
+            facecolor='#101826', edgecolor='#1e2d42', linewidth=0.9,
+            transform=ax_card1.transAxes, zorder=2
+        )
+        ax_card1.add_patch(tile_rect)
+
+        # Tile Label
+        ax_card1.text(
+            tile_x + 0.025, tile_bottom + tile_h - 0.045, tile['label'],
+            fontsize=8.2, color='#94a3b8', fontfamily='sans-serif',
+            weight='normal', va='top', ha='left', zorder=3
+        )
+
+        # Large Percentage
+        ax_card1.text(
+            tile_x + 0.025, tile_bottom + tile_h - 0.125, f"{tile['pct']}%",
+            fontsize=17.5, color=tile['color'], fontfamily='sans-serif',
+            weight='bold', va='top', ha='left', zorder=3
+        )
+
+        # Member count text
+        ax_card1.text(
+            tile_x + 0.025, tile_bottom + 0.070, f"{tile['count']} of {total_ensemble_members:,}",
+            fontsize=7.2, color='#64748b', fontfamily='sans-serif',
+            weight='normal', va='center', ha='left', zorder=3
+        )
+
+        # Progress bar
+        bar_x = tile_x + 0.025
+        bar_w = tile_w - 0.050
+        bar_y = tile_bottom + 0.025
+        bar_h = 0.018
+
+        # Background track
+        bg_bar = mpatches.FancyBboxPatch(
+            (bar_x, bar_y), bar_w, bar_h,
+            boxstyle='round,pad=0.002,rounding_size=0.006',
+            facecolor='#1e293b', edgecolor='none',
+            transform=ax_card1.transAxes, zorder=3
+        )
+        ax_card1.add_patch(bg_bar)
+
+        # Colored fill bar
+        fill_len = max(0.005, bar_w * (tile['pct'] / 100.0))
+        fill_bar = mpatches.FancyBboxPatch(
+            (bar_x, bar_y), fill_len, bar_h,
+            boxstyle='round,pad=0.002,rounding_size=0.006',
+            facecolor=tile['color'], edgecolor='none',
+            transform=ax_card1.transAxes, zorder=4
+        )
+        ax_card1.add_patch(fill_bar)
+
+    # Card 2: Modern Member Intensity Card (Container Frame & Plume)
+    card2_card_bottom = 0.355
+    card2_card_h = 0.295
+    ax_card2_bg = fig.add_axes([card_x, card2_card_bottom, card_w, card2_card_h])
+    ax_card2_bg.set_facecolor('none')
+    ax_card2_bg.set_xlim(0.0, 1.0)
+    ax_card2_bg.set_ylim(0.0, 1.0)
+    ax_card2_bg.set_xticks([])
+    ax_card2_bg.set_yticks([])
+    for spine in ax_card2_bg.spines.values():
+        spine.set_visible(False)
+
+    card2_bg = mpatches.FancyBboxPatch(
+        (0.0, 0.0), 1.0, 1.0,
+        boxstyle='round,pad=-0.004,rounding_size=0.045',
+        facecolor='#0b111d', edgecolor='#1e293b', linewidth=1.1,
+        transform=ax_card2_bg.transAxes, zorder=0
+    )
+    ax_card2_bg.add_patch(card2_bg)
+
+    # 1. Header: Title & AI intensity pill badge
+    ax_card2_bg.text(
+        0.055, 0.920, "Member intensity",
+        fontsize=11.5, weight='bold', color='#ffffff', fontfamily='sans-serif',
+        va='top', ha='left', zorder=2
+    )
+
+    is_ai_model = any(k in model_name.lower() for k in ['wnc', 'wnv3', 'large', 'ai'])
+    if is_ai_model:
+        ax_card2_bg.text(
+            0.945, 0.890, "AI intensity · treat with caution",
+            fontsize=7.8, weight='medium', color='#f59e0b', fontfamily='sans-serif',
+            va='center', ha='right', zorder=2,
+            bbox=dict(
+                boxstyle='round,pad=0.45,rounding_size=0.6',
+                facecolor='#14110b', edgecolor='#f59e0b', linewidth=1.0
+            )
+        )
+
+    # 2. Subtitle: 1-min sustained wind · peak median ...
+    if lead_stats:
+        peak_stat = max(lead_stats, key=lambda s: s['median'])
+        peak_median_kt = int(round(peak_stat['median']))
+        peak_dt = peak_stat['dt']
+        peak_med_sub = f"peak median {peak_median_kt} kt on {peak_dt.strftime('%b')} {peak_dt.day} {peak_dt.hour:02d}Z"
+    else:
+        peak_stat = None
+        peak_median_kt = None
+        peak_med_sub = "peak median N/A"
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv_c2_bg = ax_card2_bg.transAxes.inverted()
+
+    t_sub1 = ax_card2_bg.text(
+        0.055, 0.810, "1-min sustained wind · ",
+        fontsize=8.5, color='#94a3b8', fontfamily='sans-serif',
+        va='center', ha='left', zorder=2
+    )
+    bb_s1 = t_sub1.get_window_extent(renderer=renderer)
+    w_s1 = inv_c2_bg.transform((bb_s1.width, 0))[0] - inv_c2_bg.transform((0, 0))[0]
+
+    ax_card2_bg.text(
+        0.055 + w_s1, 0.810, peak_med_sub,
+        fontsize=8.5, weight='bold', color='#fbbf24', fontfamily='sans-serif',
+        va='center', ha='left', zorder=2
+    )
+
+    # 3. Inline Legend (— Median    --- Mean    ■ 25–75%    ■ 10–90%)
+    leg2_items = [
+        ("—", "#ffffff", " Median", "#ffffff"),
+        ("---", "#cbd5e1", " Mean", "#cbd5e1"),
+        ("■", "#38bdf8", " 25–75%", "#94a3b8"),
+        ("■", "#0284c7", " 10–90%", "#94a3b8")
+    ]
+    cur_lx = 0.055
+    for sym, sym_col, lbl, lbl_col in leg2_items:
+        t_sym = ax_card2_bg.text(
+            cur_lx, 0.690, sym,
+            fontsize=8.2, weight='heavy', color=sym_col, va='center', ha='left', zorder=2
+        )
+        bb_sym = t_sym.get_window_extent(renderer=renderer)
+        w_sym = inv_c2_bg.transform((bb_sym.width, 0))[0] - inv_c2_bg.transform((0, 0))[0]
+        cur_lx += w_sym + 0.006
+
+        t_lbl = ax_card2_bg.text(
+            cur_lx, 0.690, lbl,
+            fontsize=8.0, weight='semibold', color=lbl_col, va='center', ha='left', zorder=2
+        )
+        bb_lbl = t_lbl.get_window_extent(renderer=renderer)
+        w_lbl = inv_c2_bg.transform((bb_lbl.width, 0))[0] - inv_c2_bg.transform((0, 0))[0]
+        cur_lx += w_lbl + 0.032
+
+    # 4. Chart Plot Area (True Date Axis inside Card 2)
+    chart_x = card_x + card_w * 0.045
+    chart_w = card_w * 0.875
+    chart_bottom = card2_card_bottom + card2_card_h * 0.120
+    chart_h = card2_card_h * 0.510
+
+    ax_card2 = fig.add_axes([chart_x, chart_bottom, chart_w, chart_h])
+    ax_card2.set_facecolor('none')
 
     cats = [
-        ('LPA', 0, 25, '#080d1a', '#64748b'),
-        ('TD', 25, 34, '#0f172a', '#38bdf8'),
-        ('TS', 34, 64, '#064e3b', '#34d399'),
-        ('C1', 64, 83, '#713f12', '#facc15'),
-        ('C2', 83, 96, '#7c2d12', '#fb923c'),
-        ('C3', 96, 113, '#7f1d1d', '#f87171'),
-        ('C4', 113, 137, '#701a75', '#e879f9'),
-        ('C5', 137, 160, '#3b0764', '#c084fc')
+        ('LPA', 0, 25, '#080d1a', 0.45, '#94a3b8'),
+        ('TD', 25, 34, '#0c1b2e', 0.40, '#38bdf8'),
+        ('TS', 34, 64, '#042f2e', 0.35, '#2dd4bf'),
+        ('C1', 64, 83, '#2e1c07', 0.35, '#facc15'),
+        ('C2', 83, 96, '#381308', 0.35, '#fb923c'),
+        ('C3', 96, 113, '#3b0b0b', 0.35, '#f87171'),
+        ('C4', 113, 137, '#380a3a', 0.35, '#e879f9'),
+        ('C5', 137, 160, '#22083a', 0.35, '#c084fc')
     ]
-    for c_label, c_low, c_high, c_bg, c_txt in cats:
-        ax_card2.axhspan(c_low, c_high, facecolor=c_bg, alpha=0.55, edgecolor='none', zorder=1)
+    for c_label, c_low, c_high, c_bg, c_alpha, c_txt in cats:
+        ax_card2.axhspan(c_low, c_high, facecolor=c_bg, alpha=c_alpha, edgecolor='none', zorder=1)
         ax_card2.text(
-            0.015, (c_low + c_high) / 2, c_label,
-            color=c_txt, fontsize=7.2, weight='heavy', va='center', ha='left',
-            transform=ax_card2.get_yaxis_transform(), zorder=4
+            0.018, (c_low + c_high) / 2, c_label,
+            color=c_txt, fontsize=7.8, weight='bold', va='center', ha='left',
+            transform=ax_card2.get_yaxis_transform(), zorder=6
         )
 
     if lead_stats:
@@ -1740,93 +1993,145 @@ def plot_monitoring_tracks(
             tdf_dts = [init_dt + timedelta(hours=float(h)) for h in tdf['lead_time_hours']]
             ax_card2.plot(
                 tdf_dts, tdf['wind'],
-                color='#94a3b8', alpha=0.10, linewidth=0.8, zorder=2
+                color='#94a3b8', alpha=0.08, linewidth=0.7, zorder=2
             )
 
         ax_card2.fill_between(
             ls_dts, ls_p10, ls_p90,
-            color='#0284c7', alpha=0.20, label='10-90%', zorder=3
+            color='#0284c7', alpha=0.22, zorder=3
         )
         ax_card2.fill_between(
             ls_dts, ls_p25, ls_p75,
-            color='#38bdf8', alpha=0.35, label='25-75%', zorder=3
+            color='#38bdf8', alpha=0.38, zorder=3
         )
 
         ax_card2.plot(
-            ls_dts, ls_med,
-            color='#ffffff', linewidth=2.4, label='MEDIAN', zorder=5
+            ls_dts, ls_mean,
+            color='#cbd5e1', linestyle='--', linewidth=1.8, zorder=5
         )
         ax_card2.plot(
-            ls_dts, ls_mean,
-            color='#f1f5f9', linestyle='--', linewidth=1.6, label='MEAN', zorder=5
+            ls_dts, ls_med,
+            color='#ffffff', linewidth=2.8, zorder=5
         )
+
+        # Peak Median Marker (White circle with black border) & Annotation Badge
+        if peak_stat:
+            ax_card2.plot(
+                peak_stat['dt'], peak_stat['median'],
+                marker='o', markersize=6.5,
+                markerfacecolor='#ffffff', markeredgecolor='#000000', markeredgewidth=1.8,
+                zorder=10
+            )
+            ax_card2.annotate(
+                f"{peak_median_kt} kt",
+                xy=(peak_stat['dt'], peak_stat['median']),
+                xytext=(9, 4), textcoords='offset points',
+                fontsize=8.0, weight='bold', color='#ffffff',
+                bbox=dict(
+                    boxstyle='round,pad=0.28,rounding_size=0.35',
+                    facecolor='#0b111d', edgecolor='#334155', linewidth=0.9
+                ),
+                va='bottom', ha='left', zorder=11
+            )
 
         min_c2_dt = min(ls_dts)
         max_c2_dt = max(ls_dts)
         ax_card2.set_xlim(min_c2_dt, max_c2_dt)
         ax_card2.xaxis.set_major_locator(mdates.DayLocator(interval=2))
-        ax_card2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-        ax_card2.tick_params(axis='x', labelsize=7.2, colors='#94a3b8')
+        ax_card2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"{mdates.num2date(x).strftime('%b')} {mdates.num2date(x).day}"))
+        ax_card2.tick_params(axis='x', labelsize=7.6, colors='#94a3b8', length=0, pad=5)
     else:
         ax_card2.set_xlim(init_dt, init_dt + timedelta(days=7))
         ax_card2.xaxis.set_major_locator(mdates.DayLocator(interval=2))
-        ax_card2.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+        ax_card2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"{mdates.num2date(x).strftime('%b')} {mdates.num2date(x).day}"))
+        ax_card2.tick_params(axis='x', labelsize=7.6, colors='#94a3b8', length=0, pad=5)
 
     ax_card2.set_ylim(0, 160)
     ax_card2.set_yticks([0, 25, 50, 75, 100, 125, 150])
-    ax_card2.set_yticklabels(['0', '25', '50', '75', '100', '125', '150'], fontsize=7.2, color='#64748b')
+    ax_card2.set_yticklabels(['0', '25', '50', '75', '100', '125', '150'], fontsize=7.6, color='#94a3b8')
     ax_card2.yaxis.tick_right()
-    ax_card2.grid(True, linestyle=':', alpha=0.25, color='#64748b')
+    ax_card2.tick_params(axis='y', length=0, colors='#94a3b8', pad=6)
 
-    # Card 2 Header & Caveats (Clear 2-line structure with credibility note)
+    # Top "kt" unit label above 150
     ax_card2.text(
-        0.03, 1.14, "MEMBER INTENSITY (KT - 1-MIN SUSTAINED)",
-        transform=ax_card2.transAxes, fontsize=8.0, weight='heavy', color='#f8fafc'
+        1.020, 158, "kt",
+        color='#94a3b8', fontsize=7.8, fontfamily='sans-serif',
+        va='bottom', ha='left', transform=ax_card2.get_yaxis_transform(), zorder=6
     )
-    # Multi-color legend on line y = 1.05
+
+    ax_card2.grid(False)
+    for s_name, spine in ax_card2.spines.items():
+        if s_name == 'bottom':
+            spine.set_color('#1e293b')
+            spine.set_linewidth(1.0)
+        else:
+            spine.set_visible(False)
+
+    # Card 3: Modern Cumulative Probability Card (Container Frame & Trajectory)
+    card3_card_bottom = 0.045
+    card3_card_h = 0.290
+    ax_card3_bg = fig.add_axes([card_x, card3_card_bottom, card_w, card3_card_h])
+    ax_card3_bg.set_facecolor('none')
+    ax_card3_bg.set_xlim(0.0, 1.0)
+    ax_card3_bg.set_ylim(0.0, 1.0)
+    ax_card3_bg.set_xticks([])
+    ax_card3_bg.set_yticks([])
+    for spine in ax_card3_bg.spines.values():
+        spine.set_visible(False)
+
+    card3_bg = mpatches.FancyBboxPatch(
+        (0.0, 0.0), 1.0, 1.0,
+        boxstyle='round,pad=-0.004,rounding_size=0.045',
+        facecolor='#0b111d', edgecolor='#1e293b', linewidth=1.1,
+        transform=ax_card3_bg.transAxes, zorder=0
+    )
+    ax_card3_bg.add_patch(card3_bg)
+
+    # 1. Header: Title & Subtitle on left
+    ax_card3_bg.text(
+        0.055, 0.915, "Cumulative probability",
+        fontsize=11.5, weight='bold', color='#ffffff', fontfamily='sans-serif',
+        va='top', ha='left', zorder=2
+    )
+
+    end_run_disp = f"{end_run_dt.strftime('%b')} {end_run_dt.day}"
+    ax_card3_bg.text(
+        0.055, 0.810, f"Share of members reaching each intensity, through {end_run_disp}",
+        fontsize=8.5, color='#94a3b8', fontfamily='sans-serif',
+        va='center', ha='left', zorder=2
+    )
+
+    # 2. Header: Dot Legend on right (● TS    ● Typhoon    ● Major)
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
-    inv_c2 = ax_card2.transAxes.inverted()
+    inv_c3_bg = ax_card3_bg.transAxes.inverted()
 
-    leg2_items = [
-        ("—", "#ffffff", " MEDIAN", "#ffffff"),
-        ("---", "#cbd5e1", " MEAN", "#94a3b8"),
-        ("■", "#38bdf8", " 25-75%", "#94a3b8"),
-        ("■", "#0284c7", " 10-90%", "#94a3b8")
+    leg3_items = [
+        ("●", "#38bdf8", " TS", "#e2e8f0"),
+        ("●", "#f59e0b", " Typhoon", "#e2e8f0"),
+        ("●", "#ef4444", " Major", "#e2e8f0")
     ]
-    cur_x = 0.03
-    for sym, sym_col, lbl, lbl_col in leg2_items:
-        t_sym = ax_card2.text(cur_x, 1.05, sym, transform=ax_card2.transAxes,
-                              fontsize=7.2, weight='heavy', color=sym_col, va='baseline')
-        bb_sym = t_sym.get_window_extent(renderer=renderer)
-        w_sym = inv_c2.transform((bb_sym.width, 0))[0] - inv_c2.transform((0, 0))[0]
-        cur_x += w_sym + 0.005
-
-        t_lbl = ax_card2.text(cur_x, 1.05, lbl, transform=ax_card2.transAxes,
-                              fontsize=6.8, weight='bold', color=lbl_col, va='baseline')
+    cur_rx = 0.945
+    for sym, sym_col, lbl, lbl_col in reversed(leg3_items):
+        t_lbl = ax_card3_bg.text(cur_rx, 0.905, lbl, fontsize=8.0, weight='medium', color=lbl_col, va='center', ha='right', zorder=2)
         bb_lbl = t_lbl.get_window_extent(renderer=renderer)
-        w_lbl = inv_c2.transform((bb_lbl.width, 0))[0] - inv_c2.transform((0, 0))[0]
-        cur_x += w_lbl + 0.020
-    ax_card2.text(
-        0.97, 1.14, peak_median_str,
-        transform=ax_card2.transAxes, fontsize=7.6, weight='bold', color='#fbbf24', ha='right'
-    )
-    is_ai_model = any(k in model_name.lower() for k in ['wnc', 'wnv3', 'large'])
-    if is_ai_model:
-        ax_card2.text(
-            0.97, 1.05, "* AI intensity, treat with caution",
-            transform=ax_card2.transAxes, fontsize=6.8, weight='bold', color='#fbbf24', style='italic', ha='right'
-        )
+        w_lbl = inv_c3_bg.transform((bb_lbl.width, 0))[0] - inv_c3_bg.transform((0, 0))[0]
 
-    for spine in ax_card2.spines.values():
-        spine.set_edgecolor('#222d3d')
-        spine.set_linewidth(1.0)
+        sym_x = cur_rx - w_lbl - 0.004
+        t_sym = ax_card3_bg.text(sym_x, 0.905, sym, fontsize=8.2, color=sym_col, va='center', ha='right', zorder=2)
+        bb_sym = t_sym.get_window_extent(renderer=renderer)
+        w_sym = inv_c3_bg.transform((bb_sym.width, 0))[0] - inv_c3_bg.transform((0, 0))[0]
 
-    # Card 3: Probability Trend across forecast run (True Date Axis & Direct Line Labels)
-    card3_bottom = 0.045
-    card3_h = 0.240
-    ax_card3 = fig.add_axes([card_x, card3_bottom, card_w, card3_h])
-    ax_card3.set_facecolor('#0a0e17')
+        cur_rx = sym_x - w_sym - 0.025
+
+    # 3. Chart Plot Area
+    chart3_x = card_x + card_w * 0.115
+    chart3_w = card_w * 0.700
+    chart3_bottom = card3_card_bottom + card3_card_h * 0.125
+    chart3_h = card3_card_h * 0.540
+
+    ax_card3 = fig.add_axes([chart3_x, chart3_bottom, chart3_w, chart3_h])
+    ax_card3.set_facecolor('none')
 
     max_lead_h = max(48.0, df_storm['lead_time_hours'].max())
     eval_hours = np.arange(0, max_lead_h + 1, 12.0)
@@ -1845,12 +2150,12 @@ def plot_monitoring_tracks(
         ty_by_lead.append(round((ty_m / total_ensemble_members) * 100))
         maj_by_lead.append(round((maj_m / total_ensemble_members) * 100))
 
-    # Distinct layered line widths & markers so overlapping curves are visible
-    ax_card3.plot(eval_dts, ts_by_lead, color='#38bdf8', linewidth=2.8, label='TS', marker='o', markersize=3.6, zorder=4)
-    ax_card3.plot(eval_dts, ty_by_lead, color='#f59e0b', linewidth=2.0, label='TYPHOON', marker='D', markersize=3.4, zorder=5)
-    ax_card3.plot(eval_dts, maj_by_lead, color='#ef4444', linewidth=1.3, label='MAJOR', marker='^', markersize=3.6, zorder=6)
+    # Clean smooth curve lines (no cluttering markers along the line)
+    ax_card3.plot(eval_dts, ts_by_lead, color='#38bdf8', linewidth=2.6, zorder=4)
+    ax_card3.plot(eval_dts, ty_by_lead, color='#f59e0b', linewidth=2.6, zorder=5)
+    ax_card3.plot(eval_dts, maj_by_lead, color='#ef4444', linewidth=2.6, zorder=6)
 
-    # Dynamic y-axis scale based on signal strength
+    # Dynamic Y-ticks and subtle horizontal grid lines
     max_prob = max(ts_by_lead + ty_by_lead + maj_by_lead + [10])
     if max_prob <= 25:
         y_top = 30
@@ -1869,52 +2174,82 @@ def plot_monitoring_tracks(
         y_ticks = [0, 25, 50, 75, 100]
         y_labels = ['0%', '25%', '50%', '75%', '100%']
 
-    # End percentage labels (clean text, no boxes or inline labels)
-    badge_dt = eval_dts[-1] + timedelta(hours=5)
-    ax_card3.text(
-        badge_dt, ts_by_lead[-1], f"{ts_by_lead[-1]}%",
-        color='#38bdf8', fontsize=7.8, weight='heavy', va='center', ha='left', zorder=7
-    )
-    ax_card3.text(
-        badge_dt, ty_by_lead[-1], f"{ty_by_lead[-1]}%",
-        color='#f59e0b', fontsize=7.8, weight='heavy', va='center', ha='left', zorder=8
-    )
-    if maj_by_lead[-1] > 0:
-        ax_card3.text(
-            badge_dt, maj_by_lead[-1], f"{maj_by_lead[-1]}%",
-            color='#ef4444', fontsize=7.8, weight='heavy', va='center', ha='left', zorder=9
-        )
-
-    ax_card3.set_xlim(eval_dts[0] - timedelta(hours=8), eval_dts[-1] + timedelta(hours=28))
-    ax_card3.set_ylim(-1, y_top + 2)
+    ax_card3.set_ylim(-1, y_top + 4)
     ax_card3.set_yticks(y_ticks)
-    ax_card3.set_yticklabels(y_labels, fontsize=7.2, color='#64748b')
-    ax_card3.xaxis.set_major_locator(mdates.DayLocator(interval=2))
-    ax_card3.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-    ax_card3.tick_params(axis='x', labelsize=7.2, colors='#94a3b8')
-    ax_card3.grid(True, linestyle=':', alpha=0.25, color='#64748b')
+    ax_card3.set_yticklabels(y_labels, fontsize=7.6, color='#94a3b8')
+    ax_card3.tick_params(axis='y', length=0, colors='#94a3b8', pad=6)
 
-    # Card 3 Header: Title on left, colored line legend on right
-    ax_card3.text(
-        0.03, 1.10, f"CUMULATIVE PROBABILITY (THROUGH {end_run_str})",
-        transform=ax_card3.transAxes, fontsize=8.0, weight='heavy', color='#f8fafc'
-    )
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    inv = ax_card3.transAxes.inverted()
+    # Subtle horizontal grid lines at tick levels
+    for yval in y_ticks[1:]:
+        ax_card3.axhline(yval, color='#1e293b', linewidth=0.8, zorder=1)
 
-    leg_x = 0.98
-    for lbl, col in reversed([('— TS', '#38bdf8'), ('— TYPHOON', '#f59e0b'), ('— MAJOR', '#ef4444')]):
-        t = ax_card3.text(leg_x, 1.10, lbl, transform=ax_card3.transAxes, fontsize=7.2, weight='heavy', color=col, ha='right')
-        bb = t.get_window_extent(renderer=renderer)
-        p0 = inv.transform((0, 0))
-        p1 = inv.transform((bb.width, 0))
-        w_axes = p1[0] - p0[0]
-        leg_x -= (w_axes + 0.035)
+    # X-axis range and date formatting (anchored to Nov 4 stepping back 2 days)
+    ax_card3.set_xlim(eval_dts[0] - timedelta(hours=6), eval_dts[-1] + timedelta(hours=48))
+    x_tick_dts = []
+    curr_t = eval_dts[-1]
+    while curr_t >= eval_dts[0]:
+        x_tick_dts.append(curr_t)
+        curr_t -= timedelta(days=2)
+    x_tick_dts.sort()
+    ax_card3.set_xticks(x_tick_dts)
+    ax_card3.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f"{mdates.num2date(x).strftime('%b')} {mdates.num2date(x).day}"))
+    ax_card3.tick_params(axis='x', labelsize=7.6, colors='#94a3b8', length=0, pad=5)
 
-    for spine in ax_card3.spines.values():
-        spine.set_edgecolor('#222d3d')
-        spine.set_linewidth(1.0)
+    ax_card3.grid(False)
+    for s_name, spine in ax_card3.spines.items():
+        if s_name == 'bottom':
+            spine.set_color('#1e293b')
+            spine.set_linewidth(1.0)
+        else:
+            spine.set_visible(False)
+
+    # End point markers at final date
+    dt_end = eval_dts[-1]
+    ax_card3.plot(dt_end, ts_by_lead[-1], marker='o', markersize=5.8, color='#38bdf8', zorder=10)
+    ax_card3.plot(dt_end, ty_by_lead[-1], marker='o', markersize=5.8, color='#f59e0b', zorder=11)
+    if maj_by_lead[-1] > 0:
+        ax_card3.plot(dt_end, maj_by_lead[-1], marker='o', markersize=5.8, color='#ef4444', zorder=12)
+
+    # Leader lines & uncluttered end labels
+    labels_to_plot = [
+        {'key': 'ts', 'val': ts_by_lead[-1], 'name': 'TS', 'color': '#38bdf8', 'dot_y': ts_by_lead[-1]},
+        {'key': 'ty', 'val': ty_by_lead[-1], 'name': 'Typhoon', 'color': '#f59e0b', 'dot_y': ty_by_lead[-1]},
+    ]
+    if maj_by_lead[-1] > 0:
+        labels_to_plot.append({'key': 'maj', 'val': maj_by_lead[-1], 'name': 'Major', 'color': '#ef4444', 'dot_y': maj_by_lead[-1]})
+
+    min_gap = 7.5
+    labels_to_plot.sort(key=lambda item: item['dot_y'], reverse=True)
+    target_ys = [float(item['dot_y']) for item in labels_to_plot]
+    for _ in range(25):
+        for i in range(len(target_ys) - 1):
+            if target_ys[i] - target_ys[i+1] < min_gap:
+                push = (min_gap - (target_ys[i] - target_ys[i+1])) / 2.0
+                target_ys[i] += push
+                target_ys[i+1] -= push
+
+    dt_knee1 = dt_end + timedelta(hours=3.5)
+    dt_knee2 = dt_end + timedelta(hours=10.0)
+    dt_text = dt_end + timedelta(hours=13.0)
+
+    for idx, item in enumerate(labels_to_plot):
+        y_dot = item['dot_y']
+        y_tgt = target_ys[idx]
+        col = item['color']
+        val = item['val']
+        name = item['name']
+
+        ax_card3.plot(
+            [dt_end, dt_knee1, dt_knee2, dt_text],
+            [y_dot, y_dot, y_tgt, y_tgt],
+            color=col, linewidth=1.2, zorder=14
+        )
+        ax_card3.text(
+            dt_text + timedelta(hours=2.0), y_tgt,
+            f"{val}% {name}",
+            color=col, fontsize=8.2, weight='bold', fontfamily='sans-serif',
+            va='center', ha='left', zorder=15
+        )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     plt.savefig(output_path, dpi=200, bbox_inches='tight', pad_inches=0.15, facecolor='#090d14', edgecolor='none')

@@ -1655,10 +1655,14 @@ def plot_model_tracks(
         region_desc = "near the Mariana Islands / Guam"
     elif 137.0 <= mean_gen_lon < 141.0 and 11.5 <= mean_gen_lat <= 23.0:
         region_desc = "west of the Marianas"
-    elif 148.0 < mean_gen_lon <= 158.0 and 11.5 <= mean_gen_lat <= 25.0:
-        region_desc = "east of the Marianas"
-    elif 143.0 < mean_gen_lon <= 152.0 and 3.0 <= mean_gen_lat < 11.5:
+    elif 143.0 < mean_gen_lon <= 150.0 and 3.0 <= mean_gen_lat < 11.5:
         region_desc = "in the Caroline Islands / WestPac"
+    elif 150.0 < mean_gen_lon <= 161.0 and 3.0 <= mean_gen_lat <= 16.0:
+        region_desc = "in Micronesia / WestPac"
+    elif 161.0 < mean_gen_lon <= 176.0 and 3.0 <= mean_gen_lat <= 20.0:
+        region_desc = "in the Marshall Islands / WestPac"
+    elif mean_gen_lon > 176.0 and mean_gen_lat <= 20.0:
+        region_desc = "east of the Marshall Islands / WestPac"
     elif mean_gen_lon >= 152.0 and mean_gen_lat <= 20.0:
         region_desc = "in Eastern Caroline Islands / WestPac"
     elif 121.0 <= mean_gen_lon <= 130.0 and 21.5 <= mean_gen_lat <= 26.5:
@@ -2206,7 +2210,7 @@ def plot_model_tracks(
 
         # Right Column (Path Consensus)
         ax_card1.text(0.52, 0.77, "PATH CONSENSUS", fontsize=6.8, weight='bold', color='#94a3b8', transform=ax_card1.transAxes)
-        offshore_label = "OPEN PACIFIC / RECURVING" if any(w in region_desc.lower() for w in ['philippine', 'pacific', 'marianas', 'caroline']) else region_desc.upper().replace("IN THE ", "").replace("NEAR ", "")
+        offshore_label = "OPEN PACIFIC / RECURVING" if any(w in region_desc.lower() for w in ['philippine', 'pacific', 'marianas', 'caroline', 'marshall', 'micronesia']) else region_desc.upper().replace("IN THE ", "").replace("NEAR ", "")
         f_lbl_sz = 5.7 if (len(offshore_label) > 18 or total_ensemble_members >= 1000) else 6.4
         f_pct_sz = 5.6 if total_ensemble_members >= 1000 else 6.3
         ax_card1.text(0.52, 0.66, offshore_label, fontsize=f_lbl_sz, weight='heavy', color='#f1f5f9', transform=ax_card1.transAxes)
