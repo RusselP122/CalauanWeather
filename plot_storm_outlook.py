@@ -67,23 +67,43 @@ def load_track_file(file_path):
 
 
 def fetch_knack_active_storms():
-    """Fetches active tropical cyclones from the Knack API."""
-    url = "https://api.knackwx.com/atcf/v2"
+    """Fetches active tropical cyclones from the Knack API with standard lat/lon fields."""
     try:
-        req = urllib.request.Request(
-            url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode('utf-8'))
-    except Exception as e:
-        print(f"Knack API fetch error: {e}")
-        return []
+        from plot_ensemble_spaghetti import fetch_knack_active_storms as _spaghetti_fetch
+        return _spaghetti_fetch()
+    except Exception:
+        url = "https://api.knackwx.com/atcf/v2"
+        try:
+            req = urllib.request.Request(
+                url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode('utf-8'))
+            storms = []
+            for item in data:
+                lat = item.get('latitude')
+                lon = item.get('longitude')
+                if lat is None or lon is None:
+                    continue
+                storms.append({
+                    'atcf_id': item.get('atcf_id', ''),
+                    'name': item.get('storm_name', 'INVEST'),
+                    'lat': float(lat),
+                    'lon': float(lon),
+                    'init_time': item.get('analysis_time', ''),
+                    'winds': float(item.get('winds', 0) or 0),
+                    'pressure': float(item.get('pressure', 0) or 0)
+                })
+            return storms
+        except Exception as e:
+            print(f"Knack API fetch error: {e}")
+            return []
 
 
 def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
     """
     Isolates member tracks strictly for the target storm ID.
-    Prevents cross-contamination from adjacent active storms (e.g. 95W, 27W).
+    Prevents cross-contamination from adjacent active storms.
     """
     if df.empty:
         return df
@@ -92,19 +112,36 @@ def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
     target_num = int(target_clean) if target_clean.isdigit() else None
 
     # 1. Primary: Use canonical multi-storm partitioner if Knack storms are present
-    try:
-        from plot_ensemble_spaghetti import assign_tracks_to_knack_storms
-        df_assigned, ok = assign_tracks_to_knack_storms(df, knack_storms)
-        if ok:
-            matched = df_assigned[df_assigned['storm_group'] == f"knack_{target_clean}W"]
-            if not matched.empty:
-                n_tracks = len(matched.groupby(['track_id', 'sample']))
-                print(f"Cleanly partitioned {n_tracks} member tracks for knack_{target_clean}W")
-                return matched.copy()
-    except Exception as e:
-        print(f"Knack partition notice: {e}")
+    if knack_storms:
+        try:
+            from plot_ensemble_spaghetti import assign_tracks_to_knack_storms
+            df_assigned, ok = assign_tracks_to_knack_storms(df, knack_storms)
+            if ok:
+                target_keys = [f"knack_{target_clean}W", f"knack_WP{target_clean}", f"knack_{target_clean}"]
+                matched = df_assigned[df_assigned['storm_group'].isin(target_keys)]
+                if not matched.empty:
+                    n_tracks = len(matched.groupby(['track_id', 'sample']))
+                    print(f"Cleanly partitioned {n_tracks} member tracks for {target_storm_id}")
+                    member_dfs = []
+                    for sid, s_df in matched.groupby('sample'):
+                        s_sorted = s_df.sort_values('lead_time_hours').drop_duplicates(subset=['lead_time_hours'])
+                        rep_tid = s_sorted['track_id'].iloc[0]
+                        s_sorted['track_id'] = rep_tid
+                        member_dfs.append(s_sorted)
+                    return pd.concat(member_dfs, ignore_index=True) if member_dfs else matched.copy()
+        except Exception as e:
+            print(f"Knack partition notice: {e}")
 
-    # 2. Secondary fallback: Strict ATCF ID and geographic boundaries
+    # Find active storm center from Knack storms if available
+    target_ref_pos = None
+    if knack_storms:
+        for s in knack_storms:
+            atcf_clean = str(s.get('atcf_id', '')).upper().replace('WP', '').replace('W', '').strip()
+            if atcf_clean == target_clean:
+                target_ref_pos = (s.get('lat'), s.get('lon'))
+                break
+
+    # 2. Secondary fallback: Strict ATCF ID or proximity to active storm coordinates
     matched_groups = []
     for (tid, sid), t_df in df.groupby(['track_id', 'sample']):
         t_df_sorted = t_df.sort_values('lead_time_hours')
@@ -118,21 +155,30 @@ def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
             matched_groups.append((tid, sid))
             continue
 
-        f_lat = early.iloc[0]['lat']
-        f_lon = early.iloc[0]['lon']
+        f_lat = float(early.iloc[0]['lat'])
+        f_lon = float(early.iloc[0]['lon'])
 
-        # Strict non-overlapping geographic genesis nursery bounds
+        # Proximity to Knack active storm position (within ~900 km / 8.5 deg)
+        if target_ref_pos and target_ref_pos[0] is not None:
+            k_lat, k_lon = target_ref_pos
+            dl = f_lon - k_lon
+            if dl > 180:
+                dl -= 360
+            elif dl < -180:
+                dl += 360
+            dist_deg = math.sqrt((f_lat - k_lat)**2 + dl**2)
+            if dist_deg <= 8.5:
+                matched_groups.append((tid, sid))
+                continue
+
+        # Known historical nursery bounds fallback
         if target_num == 96:
-            # 96W originates far east in Micronesia (lon >= 158E, lat <= 14N)
-            # 95W was around 148-154E, so lon >= 158E completely excludes 95W
             if f_lon >= 158.0 and 4.0 <= f_lat <= 14.0:
                 matched_groups.append((tid, sid))
         elif target_num == 95:
-            # 95W originates in central/eastern Philippine Sea (lon 144-155E, lat 12-20N)
             if 144.0 <= f_lon < 156.0 and 10.0 <= f_lat <= 22.0:
                 matched_groups.append((tid, sid))
         elif target_num == 27:
-            # 27W (Koguma) originates further north (lat >= 22N)
             if f_lat >= 22.0:
                 matched_groups.append((tid, sid))
 
@@ -499,12 +545,12 @@ def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
             'ph_landfall_pct': ph_landfall_pct
         })
 
-    # Filter out negligible noise clusters (< 4% share or < 15 members)
-    # This guarantees that if only 2 distinct physical pathways exist (e.g. Taiwan & Japan),
-    # stray outlier tracks won't artificially generate an unwanted 3rd scenario.
-    significant_clusters = [c for c in raw_clusters if c['pct'] >= 4.0 or c['count'] >= 15]
+    # Filter out any scenario with lower than 10% probability (< 10.0%) as requested:
+    # "when it has 10% lower dont display"
+    significant_clusters = [c for c in raw_clusters if c['pct'] >= 10.0]
     if not significant_clusters:
-        significant_clusters = raw_clusters
+        # Fallback to dominant scenario if all raw clusters are under 10%
+        significant_clusters = [max(raw_clusters, key=lambda c: c['count'])]
 
     # Sort descending by member count
     significant_clusters.sort(key=lambda c: c['count'], reverse=True)
@@ -517,6 +563,9 @@ def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
     if total_valid > 0:
         for c in clusters:
             c['pct'] = (c['count'] / total_valid) * 100.0
+
+    # Ensure strictly only scenarios with >= 10% normalized probability are displayed
+    clusters = [c for c in clusters if c['pct'] >= 10.0]
 
     # Assign letters A, B, C and distinctive color theme
     palette = [
@@ -829,11 +878,16 @@ def render_storm_outlook(
     # Top Divider
     ax_hud.plot([0.06, 0.94], [0.74, 0.74], color='#1e293b', linewidth=1.2)
 
-    # List Scenarios A, B, C (Clean, streamlined display)
-    y_start = 0.58
-    y_gap = 0.21
+    # List Scenarios (Clean, streamlined display)
+    n_sc = len(scenarios)
+    if n_sc == 1:
+        y_start, y_gap = 0.45, 0.0
+    elif n_sc == 2:
+        y_start, y_gap = 0.52, 0.23
+    else:
+        y_start, y_gap = 0.58, 0.21
 
-    for idx, sc in enumerate(scenarios[:3]):
+    for idx, sc in enumerate(scenarios):
         y_pos = y_start - idx * y_gap
         sc_col = sc['style']['color']
         letter = sc['letter']
