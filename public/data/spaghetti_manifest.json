@@ -568,7 +568,7 @@
     "filename": "MONITORING_LPA01_20261023_18Z_gdm_wncv3.png",
     "alt_filename": "MONITORING_LPA01_20261023_18Z_gdm_wncv3.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-24T02:32:21.640938+00:00"
+    "timestamp": "2026-10-24T04:55:42.351838+00:00"
   },
   {
     "storm_id": "MONITORING_LPA01",
@@ -580,7 +580,7 @@
     "filename": "MONITORING_LPA01_20261023_18Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261023_18Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-24T02:32:28.150820+00:00"
+    "timestamp": "2026-10-24T04:55:46.801242+00:00"
   },
   {
     "storm_id": "MONITORING_LPA02",
@@ -592,7 +592,7 @@
     "filename": "MONITORING_LPA02_20261023_18Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261023_18Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-24T02:32:30.409835+00:00"
+    "timestamp": "2026-10-24T04:55:48.327735+00:00"
   },
   {
     "storm_id": "WP29",
@@ -603,7 +603,7 @@
     "unique_key": "WP29_20261023T18Z",
     "filename": "WP29_20261023_18Z_gdm_wncv3.png",
     "alt_filename": "WP29_20261023_18Z_gdm_wncv3.png",
-    "timestamp": "2026-10-24T02:32:34.749649+00:00"
+    "timestamp": "2026-10-24T04:55:51.456085+00:00"
   },
   {
     "storm_id": "WP30",
@@ -614,7 +614,7 @@
     "unique_key": "WP30_20261023T18Z",
     "filename": "WP30_20261023_18Z_gdm_wncv3.png",
     "alt_filename": "WP30_20261023_18Z_gdm_wncv3.png",
-    "timestamp": "2026-10-24T02:32:38.932716+00:00"
+    "timestamp": "2026-10-24T04:55:54.265793+00:00"
   },
   {
     "storm_id": "WP29",
@@ -625,7 +625,7 @@
     "unique_key": "WP29_20261023T18Z",
     "filename": "WP29_20261023_18Z_gdm_wnc_large.png",
     "alt_filename": "WP29_20261023_18Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-24T02:33:03.716081+00:00"
+    "timestamp": "2026-10-24T04:56:10.163116+00:00"
   },
   {
     "storm_id": "WP30",
@@ -636,6 +636,6 @@
     "unique_key": "WP30_20261023T18Z",
     "filename": "WP30_20261023_18Z_gdm_wnc_large.png",
     "alt_filename": "WP30_20261023_18Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-24T02:33:46.589286+00:00"
+    "timestamp": "2026-10-24T04:56:37.844815+00:00"
   }
 ]
