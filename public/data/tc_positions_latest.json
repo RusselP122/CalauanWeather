@@ -3,13 +3,13 @@
   "storm_name": "TC 29W",
   "track_id": "WP292026",
   "latest": {
-    "lat": 28.3,
-    "lon": 123.8,
+    "lat": 29.0,
+    "lon": 124.7,
     "pressure_hpa": 987.0,
     "wind_kt": 51.0,
     "wind_kmh": 94,
-    "movement": "NE at 12.4 km/h (6.7 kt)",
-    "init_time": "2026-10-24 18:00",
+    "movement": "NE at 19.6 km/h (10.6 kt)",
+    "init_time": "2026-10-25 00:00",
     "category": "Severe Tropical Storm"
   },
   "history": [
@@ -413,6 +413,15 @@
       "cycle": "2026-10-24 18:00",
       "lat": 28.3,
       "lon": 123.8,
+      "pressure_hpa": 987.0,
+      "wind_kt": 51.0,
+      "wind_kmh": 94,
+      "category": "Severe Tropical Storm"
+    },
+    {
+      "cycle": "2026-10-25 00:00",
+      "lat": 29.0,
+      "lon": 124.7,
       "pressure_hpa": 987.0,
       "wind_kt": 51.0,
       "wind_kmh": 94,
