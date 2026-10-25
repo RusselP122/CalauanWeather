@@ -1,73 +1,5 @@
 [
   {
-    "storm_id": "MONITORING_LPA01",
-    "atcf_id": "LPA01",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wncv3",
-    "unique_key": "MONITORING_LPA01_20261023T00Z",
-    "filename": "MONITORING_LPA01_20261023_00Z_gdm_wncv3.png",
-    "alt_filename": "MONITORING_LPA01_20261023_00Z_gdm_wncv3.png",
-    "is_monitoring": true,
-    "timestamp": "2026-10-23T14:31:01.511185+00:00"
-  },
-  {
-    "storm_id": "MONITORING_LPA01",
-    "atcf_id": "LPA01",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "MONITORING_LPA01_20261023T00Z",
-    "filename": "MONITORING_LPA01_20261023_00Z_gdm_wnc_large.png",
-    "alt_filename": "MONITORING_LPA01_20261023_00Z_gdm_wnc_large.png",
-    "is_monitoring": true,
-    "timestamp": "2026-10-23T11:59:31.565495+00:00"
-  },
-  {
-    "storm_id": "WP29",
-    "atcf_id": "29W",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wncv3",
-    "unique_key": "WP29_20261023T00Z",
-    "filename": "WP29_20261023_00Z_gdm_wncv3.png",
-    "alt_filename": "WP29_20261023_00Z_gdm_wncv3.png",
-    "timestamp": "2026-10-23T14:31:21.309384+00:00"
-  },
-  {
-    "storm_id": "WP97",
-    "atcf_id": "97W",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wncv3",
-    "unique_key": "WP97_20261023T00Z",
-    "filename": "WP97_20261023_00Z_gdm_wncv3.png",
-    "alt_filename": "WP97_20261023_00Z_gdm_wncv3.png",
-    "timestamp": "2026-10-23T11:59:39.865369+00:00"
-  },
-  {
-    "storm_id": "WP29",
-    "atcf_id": "29W",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "WP29_20261023T00Z",
-    "filename": "WP29_20261023_00Z_gdm_wnc_large.png",
-    "alt_filename": "WP29_20261023_00Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-23T12:00:05.081484+00:00"
-  },
-  {
-    "storm_id": "WP97",
-    "atcf_id": "97W",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "WP97_20261023T00Z",
-    "filename": "WP97_20261023_00Z_gdm_wnc_large.png",
-    "alt_filename": "WP97_20261023_00Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-23T12:00:46.698262+00:00"
-  },
-  {
     "storm_id": "MONITORING_LPA02",
     "atcf_id": "LPA02",
     "init_date": "20261023",
@@ -126,17 +58,6 @@
     "alt_filename": "MONITORING_LPA05_20261023_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
     "timestamp": "2026-10-23T17:27:27.338833+00:00"
-  },
-  {
-    "storm_id": "WP30",
-    "atcf_id": "30W",
-    "init_date": "20261023",
-    "cycle": "00Z",
-    "model": "gdm_wncv3",
-    "unique_key": "WP30_20261023T00Z",
-    "filename": "WP30_20261023_00Z_gdm_wncv3.png",
-    "alt_filename": "WP30_20261023_00Z_gdm_wncv3.png",
-    "timestamp": "2026-10-23T14:31:24.299129+00:00"
   },
   {
     "storm_id": "WP29",
@@ -635,7 +556,7 @@
     "unique_key": "WP29_20261025T00Z",
     "filename": "WP29_20261025_00Z_gdm_wncv3.png",
     "alt_filename": "WP29_20261025_00Z_gdm_wncv3.png",
-    "timestamp": "2026-10-25T08:34:18.632525+00:00"
+    "timestamp": "2026-10-25T11:52:52.416085+00:00"
   },
   {
     "storm_id": "WP30",
@@ -646,7 +567,7 @@
     "unique_key": "WP30_20261025T00Z",
     "filename": "WP30_20261025_00Z_gdm_wncv3.png",
     "alt_filename": "WP30_20261025_00Z_gdm_wncv3.png",
-    "timestamp": "2026-10-25T08:34:20.583260+00:00"
+    "timestamp": "2026-10-25T11:52:54.469231+00:00"
   },
   {
     "storm_id": "WP29",
@@ -657,7 +578,7 @@
     "unique_key": "WP29_20261025T00Z",
     "filename": "WP29_20261025_00Z_gdm_wnc_large.png",
     "alt_filename": "WP29_20261025_00Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-25T08:34:29.784978+00:00"
+    "timestamp": "2026-10-25T11:53:04.385664+00:00"
   },
   {
     "storm_id": "WP30",
@@ -668,6 +589,6 @@
     "unique_key": "WP30_20261025T00Z",
     "filename": "WP30_20261025_00Z_gdm_wnc_large.png",
     "alt_filename": "WP30_20261025_00Z_gdm_wnc_large.png",
-    "timestamp": "2026-10-25T08:34:49.389801+00:00"
+    "timestamp": "2026-10-25T11:53:24.711699+00:00"
   }
 ]
