@@ -679,7 +679,7 @@
     "filename": "MONITORING_LPA01_20261030_06Z_gdm_wncv3.png",
     "alt_filename": "MONITORING_LPA01_20261030_06Z_gdm_wncv3.png",
     "is_monitoring": true,
-    "timestamp": "2026-10-30T13:18:52.415863+00:00"
+    "timestamp": "2026-10-30T14:23:25.348107+00:00"
   },
   {
     "storm_id": "WP30",
@@ -690,6 +690,17 @@
     "unique_key": "WP30_20261030T06Z",
     "filename": "WP30_20261030_06Z_gdm_wncv3.png",
     "alt_filename": "WP30_20261030_06Z_gdm_wncv3.png",
-    "timestamp": "2026-10-30T13:19:17.231178+00:00"
+    "timestamp": "2026-10-30T14:23:30.849415+00:00"
+  },
+  {
+    "storm_id": "WP30",
+    "atcf_id": "30W",
+    "init_date": "20261030",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "WP30_20261030T06Z",
+    "filename": "WP30_20261030_06Z_gdm_wnc_large.png",
+    "alt_filename": "WP30_20261030_06Z_gdm_wnc_large.png",
+    "timestamp": "2026-10-30T14:23:53.187753+00:00"
   }
 ]
