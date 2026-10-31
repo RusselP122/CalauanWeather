@@ -3,13 +3,13 @@
   "storm_name": "TC 30W",
   "track_id": "WP302026",
   "latest": {
-    "lat": 19.7,
-    "lon": 144.5,
-    "pressure_hpa": 949.0,
-    "wind_kt": 119.0,
-    "wind_kmh": 220,
-    "movement": "WNW at 35.1 km/h (18.9 kt)",
-    "init_time": "2026-10-30 12:00",
+    "lat": 20.5,
+    "lon": 143.4,
+    "pressure_hpa": 951.0,
+    "wind_kt": 115.0,
+    "wind_kmh": 213,
+    "movement": "NW at 24.2 km/h (13.1 kt)",
+    "init_time": "2026-10-30 18:00",
     "category": "Super Typhoon"
   },
   "history": [
@@ -299,6 +299,15 @@
       "pressure_hpa": 949.0,
       "wind_kt": 119.0,
       "wind_kmh": 220,
+      "category": "Super Typhoon"
+    },
+    {
+      "cycle": "2026-10-30 18:00",
+      "lat": 20.5,
+      "lon": 143.4,
+      "pressure_hpa": 951.0,
+      "wind_kt": 115.0,
+      "wind_kmh": 213,
       "category": "Super Typhoon"
     }
   ]
