@@ -23,6 +23,11 @@
   ],
   "large": [
     {
+      "cycle": "2026-11-03 12:00",
+      "tracks": "fnv3_large_2026_11_03T12_00.enc",
+      "paired": "fnv3_large_paired_2026_11_03T12_00.enc"
+    },
+    {
       "cycle": "2026-11-03 06:00",
       "tracks": "fnv3_large_2026_11_03T06_00.enc",
       "paired": "fnv3_large_paired_2026_11_03T06_00.enc"
