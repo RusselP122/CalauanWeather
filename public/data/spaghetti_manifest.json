@@ -685,7 +685,7 @@
     "filename": "MONITORING_LPA02_20261104_12Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261104_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-11-04T20:00:43.814055+00:00"
+    "timestamp": "2026-11-05T00:08:12.200833+00:00"
   },
   {
     "storm_id": "MONITORING_LPA01",
@@ -697,7 +697,7 @@
     "filename": "MONITORING_LPA01_20261104_12Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261104_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-11-04T20:00:52.982649+00:00"
+    "timestamp": "2026-11-05T00:08:23.097114+00:00"
   },
   {
     "storm_id": "WP99",
@@ -708,7 +708,7 @@
     "unique_key": "WP99_20261104T12Z",
     "filename": "WP99_20261104_12Z_gdm_wnc_large.png",
     "alt_filename": "WP99_20261104_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-11-04T20:01:10.535193+00:00"
+    "timestamp": "2026-11-05T00:08:43.807533+00:00"
   },
   {
     "storm_id": "WP30",
@@ -719,6 +719,40 @@
     "unique_key": "WP30_20261104T12Z",
     "filename": "WP30_20261104_12Z_gdm_wnc_large.png",
     "alt_filename": "WP30_20261104_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-11-04T20:01:19.200266+00:00"
+    "timestamp": "2026-11-05T00:08:53.289551+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261104",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "MONITORING_LPA01_20261104T12Z",
+    "filename": "MONITORING_LPA01_20261104_12Z_gdm_wncv3.png",
+    "alt_filename": "MONITORING_LPA01_20261104_12Z_gdm_wncv3.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-05T00:07:53.166864+00:00"
+  },
+  {
+    "storm_id": "WP99",
+    "atcf_id": "99W",
+    "init_date": "20261104",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP99_20261104T12Z",
+    "filename": "WP99_20261104_12Z_gdm_wncv3.png",
+    "alt_filename": "WP99_20261104_12Z_gdm_wncv3.png",
+    "timestamp": "2026-11-05T00:08:26.376875+00:00"
+  },
+  {
+    "storm_id": "WP30",
+    "atcf_id": "30W",
+    "init_date": "20261104",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP30_20261104T12Z",
+    "filename": "WP30_20261104_12Z_gdm_wncv3.png",
+    "alt_filename": "WP30_20261104_12Z_gdm_wncv3.png",
+    "timestamp": "2026-11-05T00:08:27.751346+00:00"
   }
 ]
