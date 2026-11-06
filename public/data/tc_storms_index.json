@@ -1,5 +1,14 @@
 [
   {
+    "track_id": "WP992026",
+    "storm_name": "Invest 99W",
+    "active": true,
+    "last_updated": "2026-11-06 00:00",
+    "latest_lat": 16.9,
+    "latest_lon": 150.4,
+    "category": "Low Pressure Area"
+  },
+  {
     "track_id": "WP302026",
     "storm_name": "TC 30W",
     "active": false,
@@ -196,15 +205,6 @@
     "latest_lat": 21.7,
     "latest_lon": 111.4,
     "category": "Tropical Depression"
-  },
-  {
-    "track_id": "WP992026",
-    "storm_name": "Invest 99W",
-    "active": false,
-    "last_updated": "2026-08-26 00:00",
-    "latest_lat": 16.6,
-    "latest_lon": 161.5,
-    "category": "Low Pressure Area"
   },
   {
     "track_id": "WP192026",
