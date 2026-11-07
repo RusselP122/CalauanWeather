@@ -1,16 +1,16 @@
 {
   "active": true,
-  "storm_name": "TC 31W (Invest 99W)",
+  "storm_name": "TC 31W",
   "track_id": "WP312026",
   "latest": {
-    "lat": 18.4,
-    "lon": 145.8,
-    "pressure_hpa": 1005.0,
-    "wind_kt": 29.0,
-    "wind_kmh": 54,
-    "movement": "WNW at 31.3 km/h (16.9 kt)",
-    "init_time": "2026-11-06 18:00",
-    "category": "Tropical Depression"
+    "lat": 19.0,
+    "lon": 144.2,
+    "pressure_hpa": 1004.0,
+    "wind_kt": 35.0,
+    "wind_kmh": 65,
+    "movement": "WNW at 30.2 km/h (16.3 kt)",
+    "init_time": "2026-11-07 00:00",
+    "category": "Tropical Storm"
   },
   "history": [
     {
@@ -48,6 +48,15 @@
       "wind_kt": 29.0,
       "wind_kmh": 54,
       "category": "Tropical Depression"
+    },
+    {
+      "cycle": "2026-11-07 00:00",
+      "lat": 19.0,
+      "lon": 144.2,
+      "pressure_hpa": 1004.0,
+      "wind_kt": 35.0,
+      "wind_kmh": 65,
+      "category": "Tropical Storm"
     }
   ]
 }
