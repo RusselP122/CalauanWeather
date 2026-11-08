@@ -163,7 +163,7 @@
     "unique_key": "WP31_20261107T12Z",
     "filename": "WP31_20261107_12Z_gdm_wncv3.png",
     "alt_filename": "WP31_20261107_12Z_gdm_wncv3.png",
-    "timestamp": "2026-11-07T22:09:40.449128+00:00"
+    "timestamp": "2026-11-08T02:03:17.391788+00:00"
   },
   {
     "storm_id": "WP31",
@@ -175,5 +175,16 @@
     "filename": "WP31_20261107_12Z_gdm_wnc_large.png",
     "alt_filename": "WP31_20261107_12Z_gdm_wnc_large.png",
     "timestamp": "2026-11-07T22:10:00.501157+00:00"
+  },
+  {
+    "storm_id": "WP31",
+    "atcf_id": "31W",
+    "init_date": "20261107",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "WP31_20261107T18Z",
+    "filename": "WP31_20261107_18Z_gdm_wnc_large.png",
+    "alt_filename": "WP31_20261107_18Z_gdm_wnc_large.png",
+    "timestamp": "2026-11-08T02:03:43.782850+00:00"
   }
 ]
