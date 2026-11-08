@@ -174,5 +174,27 @@
     "filename": "WP31_20261108_06Z_gdm_wnc_large.png",
     "alt_filename": "WP31_20261108_06Z_gdm_wnc_large.png",
     "timestamp": "2026-11-08T14:09:03.531222+00:00"
+  },
+  {
+    "storm_id": "WP31",
+    "atcf_id": "31W",
+    "init_date": "20261108",
+    "cycle": "12Z",
+    "model": "gdm_wncv3",
+    "unique_key": "WP31_20261108T12Z",
+    "filename": "WP31_20261108_12Z_gdm_wncv3.png",
+    "alt_filename": "WP31_20261108_12Z_gdm_wncv3.png",
+    "timestamp": "2026-11-08T22:24:13.732142+00:00"
+  },
+  {
+    "storm_id": "WP31",
+    "atcf_id": "31W",
+    "init_date": "20261108",
+    "cycle": "12Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "WP31_20261108T12Z",
+    "filename": "WP31_20261108_12Z_gdm_wnc_large.png",
+    "alt_filename": "WP31_20261108_12Z_gdm_wnc_large.png",
+    "timestamp": "2026-11-08T22:24:37.445992+00:00"
   }
 ]
