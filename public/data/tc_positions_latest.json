@@ -3,14 +3,14 @@
   "storm_name": "TC 31W",
   "track_id": "WP312026",
   "latest": {
-    "lat": 21.2,
-    "lon": 139.9,
+    "lat": 21.4,
+    "lon": 138.7,
     "pressure_hpa": 992.0,
-    "wind_kt": 60.0,
-    "wind_kmh": 111,
-    "movement": "WNW at 31.5 km/h (17.0 kt)",
-    "init_time": "2026-11-07 18:00",
-    "category": "Severe Tropical Storm"
+    "wind_kt": 64.0,
+    "wind_kmh": 119,
+    "movement": "W at 21.0 km/h (11.4 kt)",
+    "init_time": "2026-11-08 00:00",
+    "category": "Typhoon"
   },
   "history": [
     {
@@ -84,6 +84,15 @@
       "wind_kt": 60.0,
       "wind_kmh": 111,
       "category": "Severe Tropical Storm"
+    },
+    {
+      "cycle": "2026-11-08 00:00",
+      "lat": 21.4,
+      "lon": 138.7,
+      "pressure_hpa": 992.0,
+      "wind_kt": 64.0,
+      "wind_kmh": 119,
+      "category": "Typhoon"
     }
   ]
 }
