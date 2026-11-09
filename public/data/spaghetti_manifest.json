@@ -3,50 +3,6 @@
     "storm_id": "WP31",
     "atcf_id": "31W",
     "init_date": "20261107",
-    "cycle": "06Z",
-    "model": "gdm_wncv3",
-    "unique_key": "WP31_20261107T06Z",
-    "filename": "WP31_20261107_06Z_gdm_wncv3.png",
-    "alt_filename": "WP31_20261107_06Z_gdm_wncv3.png",
-    "timestamp": "2026-11-07T14:09:19.732282+00:00"
-  },
-  {
-    "storm_id": "WP31",
-    "atcf_id": "31W",
-    "init_date": "20261107",
-    "cycle": "06Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "WP31_20261107T06Z",
-    "filename": "WP31_20261107_06Z_gdm_wnc_large.png",
-    "alt_filename": "WP31_20261107_06Z_gdm_wnc_large.png",
-    "timestamp": "2026-11-07T14:09:32.379639+00:00"
-  },
-  {
-    "storm_id": "WP31",
-    "atcf_id": "31W",
-    "init_date": "20261107",
-    "cycle": "12Z",
-    "model": "gdm_wncv3",
-    "unique_key": "WP31_20261107T12Z",
-    "filename": "WP31_20261107_12Z_gdm_wncv3.png",
-    "alt_filename": "WP31_20261107_12Z_gdm_wncv3.png",
-    "timestamp": "2026-11-08T02:03:17.391788+00:00"
-  },
-  {
-    "storm_id": "WP31",
-    "atcf_id": "31W",
-    "init_date": "20261107",
-    "cycle": "12Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "WP31_20261107T12Z",
-    "filename": "WP31_20261107_12Z_gdm_wnc_large.png",
-    "alt_filename": "WP31_20261107_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-11-07T22:10:00.501157+00:00"
-  },
-  {
-    "storm_id": "WP31",
-    "atcf_id": "31W",
-    "init_date": "20261107",
     "cycle": "18Z",
     "model": "gdm_wnc_large",
     "unique_key": "WP31_20261107T18Z",
@@ -196,7 +152,7 @@
     "unique_key": "WP31_20261109T06Z",
     "filename": "WP31_20261109_06Z_gdm_wncv3.png",
     "alt_filename": "WP31_20261109_06Z_gdm_wncv3.png",
-    "timestamp": "2026-11-09T22:35:00.846714+00:00"
+    "timestamp": "2026-11-09T23:58:29.430663+00:00"
   },
   {
     "storm_id": "WP31",
@@ -207,6 +163,6 @@
     "unique_key": "WP31_20261109T12Z",
     "filename": "WP31_20261109_12Z_gdm_wnc_large.png",
     "alt_filename": "WP31_20261109_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-11-09T22:35:11.081310+00:00"
+    "timestamp": "2026-11-09T23:58:48.869670+00:00"
   }
 ]
