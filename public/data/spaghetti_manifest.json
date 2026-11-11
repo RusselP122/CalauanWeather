@@ -187,6 +187,17 @@
     "unique_key": "WP31_20261110T12Z",
     "filename": "WP31_20261110_12Z_gdm_wncv3.png",
     "alt_filename": "WP31_20261110_12Z_gdm_wncv3.png",
-    "timestamp": "2026-11-10T22:47:39.084709+00:00"
+    "timestamp": "2026-11-11T02:05:23.953034+00:00"
+  },
+  {
+    "storm_id": "WP31",
+    "atcf_id": "31W",
+    "init_date": "20261110",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "WP31_20261110T18Z",
+    "filename": "WP31_20261110_18Z_gdm_wnc_large.png",
+    "alt_filename": "WP31_20261110_18Z_gdm_wnc_large.png",
+    "timestamp": "2026-11-11T02:05:38.833401+00:00"
   }
 ]
