@@ -288,6 +288,11 @@ def normalize_dataframe(df):
     for col in required_cols:
         if col not in df.columns:
             df[col] = np.nan
+
+    if 'track_id' in df.columns:
+        df['track_id'] = df['track_id'].apply(
+            lambda x: '' if pd.isna(x) else str(int(x)) if isinstance(x, (int, float, np.integer, np.floating)) and float(x).is_integer() else str(x)
+        )
             
     df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
     df['lon'] = pd.to_numeric(df['lon'], errors='coerce')
@@ -901,9 +906,9 @@ def cluster_and_validate_lpas(
         
         # Mark dataframe
         for t in lpa['tracks']:
-            df_wp.loc[t['index'], 'storm_group'] = sg_id
-            df_wp.loc[t['index'], 'storm_group_name'] = display_name
-            df_wp.loc[t['index'], 'rep_track_id'] = rep_id
+            df_wp.loc[t['index'], 'storm_group'] = str(sg_id)
+            df_wp.loc[t['index'], 'storm_group_name'] = str(display_name)
+            df_wp.loc[t['index'], 'rep_track_id'] = str(rep_id)
             df_wp.loc[t['index'], 'is_monitoring'] = True
             
         lpa_clusters_info.append({

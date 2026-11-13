@@ -833,6 +833,11 @@ def normalize_dataframe(df):
     for col in required_cols:
         if col not in df.columns:
             df[col] = np.nan
+
+    if 'track_id' in df.columns:
+        df['track_id'] = df['track_id'].apply(
+            lambda x: '' if pd.isna(x) else str(int(x)) if isinstance(x, (int, float, np.integer, np.floating)) and float(x).is_integer() else str(x)
+        )
             
     df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
     df['lon'] = pd.to_numeric(df['lon'], errors='coerce')
@@ -1157,12 +1162,13 @@ def cluster_genesis_locations(df, dist_threshold=6.0):
             if not best_tid:
                 best_tid = cl_tracks[0]['track_id']
                 
-            group_name = get_storm_display_name(best_tid)
+            best_tid_str = str(best_tid) if best_tid is not None else 'UNKNOWN'
+            group_name = get_storm_display_name(best_tid_str)
             
             for t in cl_tracks:
-                df.loc[t['points_index'], 'storm_group'] = group_id
-                df.loc[t['points_index'], 'storm_group_name'] = group_name
-                df.loc[t['points_index'], 'rep_track_id'] = best_tid
+                df.loc[t['points_index'], 'storm_group'] = str(group_id)
+                df.loc[t['points_index'], 'storm_group_name'] = str(group_name)
+                df.loc[t['points_index'], 'rep_track_id'] = best_tid_str
                 
     return df
 
@@ -1450,7 +1456,7 @@ def plot_model_tracks(
                 active_storm_info = ks
                 break
 
-    rep_track_id = df_storm['rep_track_id'].dropna().iloc[0] if ('rep_track_id' in df_storm.columns and not df_storm['rep_track_id'].dropna().empty) else ''
+    rep_track_id = str(df_storm['rep_track_id'].dropna().iloc[0]) if ('rep_track_id' in df_storm.columns and not df_storm['rep_track_id'].dropna().empty) else ''
 
     if active_storm_info:
         real_name = active_storm_info.get('name', storm_name).strip()
@@ -2623,9 +2629,9 @@ def map_hdbscan_clusters_to_knack_storms(df, knack_storms, dist_threshold=4.0):
     # Apply the mappings to the dataframe
     for orig_group_id, mapping in mapped_groups.items():
         mask = df['storm_group'] == orig_group_id
-        df.loc[mask, 'storm_group'] = mapping['storm_group']
-        df.loc[mask, 'storm_group_name'] = mapping['storm_group_name']
-        df.loc[mask, 'rep_track_id'] = mapping['rep_track_id']
+        df.loc[mask, 'storm_group'] = str(mapping['storm_group'])
+        df.loc[mask, 'storm_group_name'] = str(mapping['storm_group_name'])
+        df.loc[mask, 'rep_track_id'] = str(mapping['rep_track_id'])
         print(f"Mapped HDBSCAN cluster {orig_group_id} to Knack storm {mapping['atcf_id']} (dist: {mapping['dist']:.2f} deg, target lead: {mapping['lead_time']:.1f}h)")
         
     return df, has_mapped
@@ -2694,9 +2700,9 @@ def assign_tracks_to_knack_storms(df, knack_storms):
         if best_s:
             s_data = storm_info[best_s]
             t_idx = t_df.index
-            df.loc[t_idx, 'storm_group'] = f"knack_{best_s}"
-            df.loc[t_idx, 'storm_group_name'] = s_data['display_name']
-            df.loc[t_idx, 'rep_track_id'] = best_s
+            df.loc[t_idx, 'storm_group'] = str(f"knack_{best_s}")
+            df.loc[t_idx, 'storm_group_name'] = str(s_data['display_name'])
+            df.loc[t_idx, 'rep_track_id'] = str(best_s)
             has_mapped = True
 
     if has_mapped:
@@ -2846,7 +2852,7 @@ def main():
                 continue
                 
             group_df = wp_df[wp_df['storm_group'] == sg_id]
-            rep_track_id = group_df['rep_track_id'].dropna().iloc[0]
+            rep_track_id = str(group_df['rep_track_id'].dropna().iloc[0]) if not group_df['rep_track_id'].dropna().empty else 'UNKNOWN'
             
             # Track initialization time to determine date (YYYYMMDD) and cycle (00Z, 06Z, 12Z, 18Z)
             init_time_raw = group_df['init_time'].dropna().iloc[0] if not group_df['init_time'].isna().all() else 'Unknown'
