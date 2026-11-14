@@ -1,16 +1,5 @@
 [
   {
-    "storm_id": "WP31",
-    "atcf_id": "31W",
-    "init_date": "20261111",
-    "cycle": "12Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "WP31_20261111T12Z",
-    "filename": "WP31_20261111_12Z_gdm_wnc_large.png",
-    "alt_filename": "WP31_20261111_12Z_gdm_wnc_large.png",
-    "timestamp": "2026-11-11T22:28:18.032500+00:00"
-  },
-  {
     "storm_id": "MONITORING_LPA01",
     "atcf_id": "LPA01",
     "init_date": "20261111",
@@ -45,17 +34,6 @@
     "alt_filename": "MONITORING_LPA02_20261111_18Z_gdm_wnc_large.png",
     "is_monitoring": true,
     "timestamp": "2026-11-12T01:59:27.008974+00:00"
-  },
-  {
-    "storm_id": "WP31",
-    "atcf_id": "31W",
-    "init_date": "20261111",
-    "cycle": "12Z",
-    "model": "gdm_wncv3",
-    "unique_key": "WP31_20261111T12Z",
-    "filename": "WP31_20261111_12Z_gdm_wncv3.png",
-    "alt_filename": "WP31_20261111_12Z_gdm_wncv3.png",
-    "timestamp": "2026-11-12T01:59:29.905373+00:00"
   },
   {
     "storm_id": "MONITORING_LPA03",
@@ -500,5 +478,89 @@
     "alt_filename": "MONITORING_LPA06_20261113_12Z_gdm_wnc_large.png",
     "is_monitoring": true,
     "timestamp": "2026-11-13T21:11:22.362784+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA04",
+    "atcf_id": "LPA04",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA04_20261113T18Z",
+    "filename": "MONITORING_LPA04_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA04_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:03:58.662758+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA01_20261113T18Z",
+    "filename": "MONITORING_LPA01_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA01_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:04:01.062280+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA02_20261113T18Z",
+    "filename": "MONITORING_LPA02_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA02_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:04:02.875311+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA07",
+    "atcf_id": "LPA07",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA07_20261113T18Z",
+    "filename": "MONITORING_LPA07_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA07_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:04:03.957059+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA06",
+    "atcf_id": "LPA06",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA06_20261113T18Z",
+    "filename": "MONITORING_LPA06_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA06_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:04:05.152450+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA05",
+    "atcf_id": "LPA05",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA05_20261113T18Z",
+    "filename": "MONITORING_LPA05_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA05_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:04:06.317497+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA03",
+    "atcf_id": "LPA03",
+    "init_date": "20261113",
+    "cycle": "18Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA03_20261113T18Z",
+    "filename": "MONITORING_LPA03_20261113_18Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA03_20261113_18Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-14T02:04:07.860851+00:00"
   }
 ]
