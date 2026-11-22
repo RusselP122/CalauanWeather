@@ -297,7 +297,7 @@
     "filename": "MONITORING_LPA02_20261122_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA02_20261122_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-11-22T07:11:24.030285+00:00"
+    "timestamp": "2026-11-22T07:57:22.989265+00:00"
   },
   {
     "storm_id": "MONITORING_LPA01",
@@ -309,6 +309,6 @@
     "filename": "MONITORING_LPA01_20261122_00Z_gdm_wnc_large.png",
     "alt_filename": "MONITORING_LPA01_20261122_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
-    "timestamp": "2026-11-22T07:11:26.233043+00:00"
+    "timestamp": "2026-11-22T07:57:26.300700+00:00"
   }
 ]
