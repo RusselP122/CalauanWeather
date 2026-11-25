@@ -1,41 +1,5 @@
 [
   {
-    "storm_id": "MONITORING_LPA02",
-    "atcf_id": "LPA02",
-    "init_date": "20261123",
-    "cycle": "06Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "MONITORING_LPA02_20261123T06Z",
-    "filename": "MONITORING_LPA02_20261123_06Z_gdm_wnc_large.png",
-    "alt_filename": "MONITORING_LPA02_20261123_06Z_gdm_wnc_large.png",
-    "is_monitoring": true,
-    "timestamp": "2026-11-23T13:46:14.674370+00:00"
-  },
-  {
-    "storm_id": "MONITORING_LPA01",
-    "atcf_id": "LPA01",
-    "init_date": "20261123",
-    "cycle": "06Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "MONITORING_LPA01_20261123T06Z",
-    "filename": "MONITORING_LPA01_20261123_06Z_gdm_wnc_large.png",
-    "alt_filename": "MONITORING_LPA01_20261123_06Z_gdm_wnc_large.png",
-    "is_monitoring": true,
-    "timestamp": "2026-11-23T13:46:17.608784+00:00"
-  },
-  {
-    "storm_id": "MONITORING_LPA03",
-    "atcf_id": "LPA03",
-    "init_date": "20261123",
-    "cycle": "06Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "MONITORING_LPA03_20261123T06Z",
-    "filename": "MONITORING_LPA03_20261123_06Z_gdm_wnc_large.png",
-    "alt_filename": "MONITORING_LPA03_20261123_06Z_gdm_wnc_large.png",
-    "is_monitoring": true,
-    "timestamp": "2026-11-23T13:46:19.152278+00:00"
-  },
-  {
     "storm_id": "MONITORING_LPA01",
     "atcf_id": "LPA01",
     "init_date": "20261123",
@@ -382,5 +346,77 @@
     "alt_filename": "MONITORING_LPA04_20261125_00Z_gdm_wnc_large.png",
     "is_monitoring": true,
     "timestamp": "2026-11-25T08:56:41.166009+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261125",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA02_20261125T06Z",
+    "filename": "MONITORING_LPA02_20261125_06Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA02_20261125_06Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-25T13:42:29.261602+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA06",
+    "atcf_id": "LPA06",
+    "init_date": "20261125",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA06_20261125T06Z",
+    "filename": "MONITORING_LPA06_20261125_06Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA06_20261125_06Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-25T13:42:30.843165+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261125",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA01_20261125T06Z",
+    "filename": "MONITORING_LPA01_20261125_06Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA01_20261125_06Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-25T13:42:36.952480+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA03",
+    "atcf_id": "LPA03",
+    "init_date": "20261125",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA03_20261125T06Z",
+    "filename": "MONITORING_LPA03_20261125_06Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA03_20261125_06Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-25T13:42:39.128733+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA04",
+    "atcf_id": "LPA04",
+    "init_date": "20261125",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA04_20261125T06Z",
+    "filename": "MONITORING_LPA04_20261125_06Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA04_20261125_06Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-25T13:42:41.073724+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA05",
+    "atcf_id": "LPA05",
+    "init_date": "20261125",
+    "cycle": "06Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA05_20261125T06Z",
+    "filename": "MONITORING_LPA05_20261125_06Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA05_20261125_06Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-25T13:42:42.894827+00:00"
   }
 ]
