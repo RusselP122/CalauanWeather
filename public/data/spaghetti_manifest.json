@@ -1,29 +1,5 @@
 [
   {
-    "storm_id": "MONITORING_LPA01",
-    "atcf_id": "LPA01",
-    "init_date": "20261126",
-    "cycle": "12Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "MONITORING_LPA01_20261126T12Z",
-    "filename": "MONITORING_LPA01_20261126_12Z_gdm_wnc_large.png",
-    "alt_filename": "MONITORING_LPA01_20261126_12Z_gdm_wnc_large.png",
-    "is_monitoring": true,
-    "timestamp": "2026-11-26T21:48:53.648006+00:00"
-  },
-  {
-    "storm_id": "MONITORING_LPA02",
-    "atcf_id": "LPA02",
-    "init_date": "20261126",
-    "cycle": "12Z",
-    "model": "gdm_wnc_large",
-    "unique_key": "MONITORING_LPA02_20261126T12Z",
-    "filename": "MONITORING_LPA02_20261126_12Z_gdm_wnc_large.png",
-    "alt_filename": "MONITORING_LPA02_20261126_12Z_gdm_wnc_large.png",
-    "is_monitoring": true,
-    "timestamp": "2026-11-26T21:48:55.470093+00:00"
-  },
-  {
     "storm_id": "MONITORING_LPA02",
     "atcf_id": "LPA02",
     "init_date": "20261126",
@@ -334,5 +310,41 @@
     "alt_filename": "MONITORING_LPA03_20261128_06Z_gdm_wnc_large.png",
     "is_monitoring": true,
     "timestamp": "2026-11-28T13:36:56.024923+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA01",
+    "atcf_id": "LPA01",
+    "init_date": "20261128",
+    "cycle": "12Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA01_20261128T12Z",
+    "filename": "MONITORING_LPA01_20261128_12Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA01_20261128_12Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-28T20:25:53.491498+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA02",
+    "atcf_id": "LPA02",
+    "init_date": "20261128",
+    "cycle": "12Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA02_20261128T12Z",
+    "filename": "MONITORING_LPA02_20261128_12Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA02_20261128_12Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-28T20:25:55.202324+00:00"
+  },
+  {
+    "storm_id": "MONITORING_LPA03",
+    "atcf_id": "LPA03",
+    "init_date": "20261128",
+    "cycle": "12Z",
+    "model": "gdm_wnc_large",
+    "unique_key": "MONITORING_LPA03_20261128T12Z",
+    "filename": "MONITORING_LPA03_20261128_12Z_gdm_wnc_large.png",
+    "alt_filename": "MONITORING_LPA03_20261128_12Z_gdm_wnc_large.png",
+    "is_monitoring": true,
+    "timestamp": "2026-11-28T20:25:56.775744+00:00"
   }
 ]
