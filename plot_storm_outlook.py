@@ -25,10 +25,53 @@ from matplotlib.collections import LineCollection
 import matplotlib.colors as mcolors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from shapely.geometry import Point, Polygon, shape
+from shapely.geometry import Point, Polygon, LineString, shape
 from shapely.ops import unary_union
+from shapely.strtree import STRtree
 from sklearn.cluster import KMeans
 import urllib.request
+
+
+def _normalize_outlook_df(df):
+    """Standardizes track column names, numeric dtypes, and [-180, 180] longitudes."""
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df
+
+    df = df.copy()
+    df.columns = df.columns.str.strip()
+
+    rename_dict = {}
+    for col in df.columns:
+        col_lower = col.lower()
+        if col_lower in ('latitude', 'lat_str') and 'lat' not in df.columns:
+            rename_dict[col] = 'lat'
+        elif col_lower in ('longitude', 'lon_str') and 'lon' not in df.columns:
+            rename_dict[col] = 'lon'
+        elif col_lower == 'tau' and 'lead_time_hours' not in df.columns:
+            rename_dict[col] = 'lead_time_hours'
+    if rename_dict:
+        df = df.rename(columns=rename_dict)
+
+    if 'lead_time_hours' not in df.columns and 'lead_time' in df.columns:
+        try:
+            df['lead_time_hours'] = pd.to_timedelta(df['lead_time']).dt.total_seconds() / 3600.0
+        except (ValueError, TypeError):
+            df['lead_time_hours'] = np.nan
+
+    if 'maximum_sustained_wind_speed_knots' not in df.columns:
+        for alt_wind in ('wind', 'vmax', 'max_wind'):
+            if alt_wind in df.columns:
+                df['maximum_sustained_wind_speed_knots'] = df[alt_wind]
+                break
+
+    for num_col in ('lat', 'lon', 'lead_time_hours', 'maximum_sustained_wind_speed_knots'):
+        if num_col in df.columns:
+            df[num_col] = pd.to_numeric(df[num_col], errors='coerce')
+
+    if 'lon' in df.columns:
+        df['lon'] = np.where(df['lon'] > 180.0, df['lon'] - 360.0, df['lon'])
+
+    return df
 
 
 def load_track_file(file_path):
@@ -38,6 +81,7 @@ def load_track_file(file_path):
         return pd.DataFrame()
 
     if file_path.endswith('.enc') or file_path.endswith('.dat'):
+        encrypted_bytes = None
         try:
             with open(file_path, 'rb') as f:
                 b64_content = f.read().strip()
@@ -48,19 +92,22 @@ def load_track_file(file_path):
             dec_arr = enc_arr ^ np.resize(key_arr, len(enc_arr))
             csv_text = dec_arr.tobytes().decode('utf-8')
             df = pd.read_csv(io.StringIO(csv_text), comment='#')
-            return df
+            return _normalize_outlook_df(df)
         except Exception as e:
-            try:
-                decrypted_bytes = bytearray([b ^ 0xAA for b in encrypted_bytes])
-                csv_text = decrypted_bytes.decode('utf-8')
-                df = pd.read_csv(io.StringIO(csv_text), comment='#')
-                return df
-            except Exception as e2:
-                print(f"Failed to decrypt {file_path}: {e2}")
-                return pd.DataFrame()
+            if encrypted_bytes is not None:
+                try:
+                    decrypted_bytes = bytearray([b ^ 0xAA for b in encrypted_bytes])
+                    csv_text = decrypted_bytes.decode('utf-8')
+                    df = pd.read_csv(io.StringIO(csv_text), comment='#')
+                    return _normalize_outlook_df(df)
+                except Exception as e2:
+                    print(f"Failed to decrypt {file_path}: {e2}")
+                    return pd.DataFrame()
+            print(f"Failed to decrypt {file_path}: {e}")
+            return pd.DataFrame()
 
     try:
-        return pd.read_csv(file_path, comment='#')
+        return _normalize_outlook_df(pd.read_csv(file_path, comment='#'))
     except Exception as e:
         print(f"Error reading CSV {file_path}: {e}")
         return pd.DataFrame()
@@ -100,25 +147,73 @@ def fetch_knack_active_storms():
             return []
 
 
+def _haversine_km(lat1, lon1, lat2, lon2):
+    """Great-circle distance in kilometers between two lat/lon points."""
+    r_earth = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2.0) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2.0) ** 2
+    )
+    return r_earth * 2.0 * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _extract_storm_num(storm_id_str):
+    """Extracts 2-digit ATCF cyclone number from strings like '96W', 'WP96', 'WP962026'."""
+    s = str(storm_id_str).upper().strip()
+    m = re.search(r'(?:WP|EP|AL|CP|IO|SH)(\d{2})(?:\d{4})?', s)
+    if m:
+        return int(m.group(1))
+    m2 = re.search(r'(?:^|\D)(\d{1,2})W(?:\D|$)', s)
+    if m2:
+        return int(m2.group(1))
+    return int(s) if s.isdigit() else None
+
+
 def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
     """
     Isolates member tracks strictly for the target storm ID.
     Prevents cross-contamination from adjacent active storms.
     """
+    df = _normalize_outlook_df(df)
     if df.empty:
         return df
 
+    # Drop invalid coordinates and paired ensemble mean row (-1) when numeric samples exist
+    df = df.dropna(subset=['lat', 'lon', 'lead_time_hours']).copy()
+    if df.empty:
+        return df
+    if 'sample' in df.columns:
+        sample_num = pd.to_numeric(df['sample'], errors='coerce')
+        if sample_num.notna().any():
+            df = df[sample_num != -1].copy()
+
     target_clean = str(target_storm_id).upper().replace('WP', '').replace('W', '').strip()
-    target_num = int(target_clean) if target_clean.isdigit() else None
+    target_num = _extract_storm_num(target_storm_id)
+    if target_num is not None:
+        target_clean = f"{target_num:02d}"
 
     # 1. Primary: Use canonical multi-storm partitioner if Knack storms are present
     if knack_storms:
         try:
             from plot_ensemble_spaghetti import assign_tracks_to_knack_storms
-            df_assigned, ok = assign_tracks_to_knack_storms(df, knack_storms)
+            df_assigned, ok = assign_tracks_to_knack_storms(df.sort_values('lead_time_hours'), knack_storms)
             if ok:
-                target_keys = [f"knack_{target_clean}W", f"knack_WP{target_clean}", f"knack_{target_clean}"]
-                matched = df_assigned[df_assigned['storm_group'].isin(target_keys)]
+                matched_mask = df_assigned['storm_group'].astype(str).apply(
+                    lambda sg: sg.startswith('knack_') and _extract_storm_num(sg.replace('knack_', '')) == target_num
+                ) if target_num is not None else df_assigned['storm_group'].isin(
+                    [f"knack_{target_clean}W", f"knack_WP{target_clean}", f"knack_{target_clean}"]
+                )
+                matched = df_assigned[matched_mask]
+                if target_num is not None and not matched.empty:
+                    def _same_or_generic_tid(tval):
+                        ts = str(tval).upper().strip()
+                        if ts.isdigit():
+                            return True
+                        tnum = _extract_storm_num(ts)
+                        return tnum is None or tnum == target_num
+                    matched = matched[matched['track_id'].apply(_same_or_generic_tid)]
                 if not matched.empty:
                     n_tracks = len(matched.groupby(['track_id', 'sample']))
                     print(f"Cleanly partitioned {n_tracks} member tracks for {target_storm_id}")
@@ -136,8 +231,10 @@ def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
     target_ref_pos = None
     if knack_storms:
         for s in knack_storms:
-            atcf_clean = str(s.get('atcf_id', '')).upper().replace('WP', '').replace('W', '').strip()
-            if atcf_clean == target_clean:
+            s_num = _extract_storm_num(s.get('atcf_id', ''))
+            if (target_num is not None and s_num == target_num) or (
+                str(s.get('atcf_id', '')).upper().replace('WP', '').replace('W', '').strip() == target_clean
+            ):
                 target_ref_pos = (s.get('lat'), s.get('lon'))
                 break
 
@@ -149,25 +246,25 @@ def isolate_storm_tracks(df, target_storm_id="96W", knack_storms=None):
         if early.empty:
             continue
 
-        tid_str = str(tid).upper()
+        tid_str = str(tid).upper().strip()
+        tid_storm_num = _extract_storm_num(tid_str) if not tid_str.isdigit() else None
+
         # Direct track_id match
         if target_num is not None and (f"WP{target_num:02d}" in tid_str or f"{target_num:02d}W" in tid_str):
             matched_groups.append((tid, sid))
             continue
 
+        # Never absorb tracks explicitly labeled as a different ATCF storm
+        if tid_storm_num is not None and target_num is not None and tid_storm_num != target_num:
+            continue
+
         f_lat = float(early.iloc[0]['lat'])
         f_lon = float(early.iloc[0]['lon'])
 
-        # Proximity to Knack active storm position (within ~900 km / 8.5 deg)
-        if target_ref_pos and target_ref_pos[0] is not None:
-            k_lat, k_lon = target_ref_pos
-            dl = f_lon - k_lon
-            if dl > 180:
-                dl -= 360
-            elif dl < -180:
-                dl += 360
-            dist_deg = math.sqrt((f_lat - k_lat)**2 + dl**2)
-            if dist_deg <= 8.5:
+        # Proximity to Knack active storm position (within ~950 km / ~8.5 deg)
+        if target_ref_pos and target_ref_pos[0] is not None and target_ref_pos[1] is not None:
+            k_lat, k_lon = float(target_ref_pos[0]), float(target_ref_pos[1])
+            if _haversine_km(f_lat, f_lon, k_lat, k_lon) <= 950.0:
                 matched_groups.append((tid, sid))
                 continue
 
@@ -273,208 +370,582 @@ def build_unified_cone(df_storm, max_lead_hours=318, confidence_percentile=67):
         return None, pts_by_lead
 
 
+_PH_PROVINCE_REGION_MAP = {
+    # Luzon Strait / Batanes
+    'Batanes': ('LANDFALL · TAIWAN / LUZON STRAIT', 'TAIWAN_STRAIT'),
+    # Northern Luzon
+    'Cagayan': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Isabela': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Apayao': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Kalinga': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Abra': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Ilocos Norte': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Ilocos Sur': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Mountain Province': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Ifugao': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Quirino': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Nueva Vizcaya': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'Benguet': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    'La Union': ('LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'),
+    # Aurora / Quezon / Polillo
+    'Aurora': ('LANDFALL · AURORA / QUEZON / POLILLO', 'LUZON'),
+    'Quezon': ('LANDFALL · AURORA / QUEZON / POLILLO', 'LUZON'),
+    # Central & Western Luzon
+    'Pangasinan': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Zambales': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Bataan': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Tarlac': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Nueva Ecija': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Pampanga': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Bulacan': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Metropolitan Manila': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Rizal': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Cavite': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    'Laguna': ('LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'),
+    # Bicol Region / Catanduanes
+    'Catanduanes': ('LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'),
+    'Camarines Norte': ('LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'),
+    'Camarines Sur': ('LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'),
+    'Albay': ('LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'),
+    'Sorsogon': ('LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'),
+    'Masbate': ('LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'),
+    # Southern Luzon / Mindoro / MIMAROPA
+    'Batangas': ('LANDFALL · S. LUZON / MINDORO / MIMAROPA', 'LUZON'),
+    'Occidental Mindoro': ('LANDFALL · S. LUZON / MINDORO / MIMAROPA', 'LUZON'),
+    'Oriental Mindoro': ('LANDFALL · S. LUZON / MINDORO / MIMAROPA', 'LUZON'),
+    'Marinduque': ('LANDFALL · S. LUZON / MINDORO / MIMAROPA', 'LUZON'),
+    'Romblon': ('LANDFALL · S. LUZON / MINDORO / MIMAROPA', 'LUZON'),
+    # Palawan
+    'Palawan': ('PASSES PALAWAN · SULU SEA / SCS', 'PALAWAN'),
+    # Eastern Visayas
+    'Northern Samar': ('LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'),
+    'Eastern Samar': ('LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'),
+    'Samar': ('LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'),
+    'Biliran': ('LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'),
+    'Leyte': ('LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'),
+    'Southern Leyte': ('LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'),
+    # Central & Western Visayas
+    'Cebu': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Bohol': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Siquijor': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Negros Oriental': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Negros Occidental': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Iloilo': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Guimaras': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Capiz': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Aklan': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    'Antique': ('LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'),
+    # Caraga / Dinagat / Siargao / Surigao
+    'Dinagat Islands': ('LANDFALL · DINAGAT / SIARGAO / SURIGAO', 'MINDANAO'),
+    'Surigao del Norte': ('LANDFALL · DINAGAT / SIARGAO / SURIGAO', 'MINDANAO'),
+    'Surigao del Sur': ('LANDFALL · DINAGAT / SIARGAO / SURIGAO', 'MINDANAO'),
+    'Agusan del Norte': ('LANDFALL · DINAGAT / SIARGAO / SURIGAO', 'MINDANAO'),
+    'Agusan del Sur': ('LANDFALL · DINAGAT / SIARGAO / SURIGAO', 'MINDANAO'),
+    # Davao / Central / Western Mindanao & Sulu Archipelago
+    'Davao Oriental': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Compostela Valley': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Davao del Norte': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Davao del Sur': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Bukidnon': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Misamis Oriental': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Misamis Occidental': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Camiguin': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Lanao del Norte': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Lanao del Sur': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'North Cotabato': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'South Cotabato': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Sarangani': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Sultan Kudarat': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Maguindanao': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Shariff Kabunsuan': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Zamboanga del Norte': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Zamboanga del Sur': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Zamboanga Sibugay': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Basilan': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Sulu': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+    'Tawi-Tawi': ('LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'),
+}
+
+_PH_REGION_CACHE = None
+
+
+def _get_ph_region_index():
+    """
+    Loads and caches Shapely STRtree over buffered Philippine province polygons,
+    Taiwan polygon, and the Luzon Strait corridor for accurate segment-based landfall checks.
+    """
+    global _PH_REGION_CACHE
+    if _PH_REGION_CACHE is not None:
+        return _PH_REGION_CACHE
+
+    taiwan_poly = Polygon([
+        (120.05, 21.95), (120.85, 21.90), (121.55, 22.75),
+        (122.00, 25.05), (121.55, 25.30), (120.80, 24.80), (120.15, 23.60)
+    ]).buffer(0.04)
+    strait_corridor = Polygon([
+        (120.20, 18.75), (122.20, 18.75), (122.20, 22.00), (120.20, 22.00)
+    ])
+
+    geojson_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "public", "data", "ph_provinces.json"),
+        "public/data/ph_provinces.json"
+    ]
+    found_geojson = next((p for p in geojson_paths if os.path.exists(p)), None)
+    if not found_geojson:
+        _PH_REGION_CACHE = {
+            'tree': None, 'geoms': [], 'names': [], 'cats': [],
+            'taiwan': taiwan_poly, 'strait': strait_corridor
+        }
+        return _PH_REGION_CACHE
+
+    try:
+        with open(found_geojson, 'r', encoding='utf-8') as gf:
+            gj = json.load(gf)
+        geoms, names, cats = [], [], []
+        for feat in gj.get('features', []):
+            geom = feat.get('geometry')
+            if not geom:
+                continue
+            props = feat.get('properties', {})
+            prov_name = str(props.get('PROVINCE') or props.get('NAME_1') or '').strip()
+            cat_info = _PH_PROVINCE_REGION_MAP.get(prov_name)
+            if not cat_info:
+                continue
+            # Tiny ~4.4 km coastal buffer catches shoreline grazes & narrow islands without false offshore hits
+            geoms.append(shape(geom).buffer(0.04))
+            names.append(prov_name)
+            cats.append(cat_info)
+
+        tree = STRtree(geoms) if geoms else None
+        _PH_REGION_CACHE = {
+            'tree': tree, 'geoms': geoms, 'names': names, 'cats': cats,
+            'taiwan': taiwan_poly, 'strait': strait_corridor
+        }
+    except Exception as e:
+        print(f"Warning: Failed to build PH region STRtree: {e}")
+        _PH_REGION_CACHE = {
+            'tree': None, 'geoms': [], 'names': [], 'cats': [],
+            'taiwan': taiwan_poly, 'strait': strait_corridor
+        }
+
+    return _PH_REGION_CACHE
+
+
+def _unwrap_wnp_lons(lons):
+    """Unwraps WNP longitudes continuously across the 180° antimeridian."""
+    arr = np.asarray(lons, dtype=float)
+    if len(arr) == 0:
+        return arr
+    # Only convert negative (-180..0) longitudes to 180..360 when track lies in WNP/Central Pacific
+    if np.nanmax(arr) > 90.0 or np.nanmin(arr) < -100.0:
+        arr = np.where((arr < 0.0) & (arr >= -180.0), arr + 360.0, arr)
+    return arr
+
+
+def _find_chronological_hits(lon_u, lats, leads):
+    """
+    Finds chronological landfall hits against PH province polygons and Taiwan,
+    plus separate Luzon Strait water corridor crossings.
+    Returns (land_hits, strait_hits), each sorted chronologically as (lead_h, cat_name, macro_group).
+    """
+    idx_data = _get_ph_region_index()
+    tree = idx_data['tree']
+    geoms = idx_data['geoms']
+    names = idx_data['names']
+    cats = idx_data['cats']
+    taiwan_poly = idx_data['taiwan']
+    strait_corridor = idx_data['strait']
+
+    land_hits = []
+    strait_hits = []
+
+    for i in range(len(lon_u) - 1):
+        x1, y1, h1 = float(lon_u[i]), float(lats[i]), float(leads[i])
+        x2, y2, h2 = float(lon_u[i + 1]), float(lats[i + 1]), float(leads[i + 1])
+
+        # Skip segments completely outside PH / Taiwan / Strait domain
+        if max(x1, x2) < 116.5 or min(x1, x2) > 127.0 or max(y1, y2) < 4.4 or min(y1, y2) > 25.6:
+            continue
+
+        seg = LineString([(x1, y1), (x2, y2)])
+        seg_len = seg.length
+        p_start = Point(x1, y1)
+        seg_land_hits = []
+
+        if tree is not None:
+            for idx in tree.query(seg, predicate='intersects'):
+                inter = seg.intersection(geoms[idx])
+                if inter.is_empty:
+                    continue
+                entry_dist = p_start.distance(inter)
+                frac = (entry_dist / seg_len) if seg_len > 0 else 0.0
+                hit_lead = h1 + frac * (h2 - h1)
+                cat_name, macro = cats[idx]
+                if names[idx] == 'Cagayan' and inter.centroid.y >= 18.75:
+                    cat_name, macro = ('LANDFALL · TAIWAN / LUZON STRAIT', 'TAIWAN_STRAIT')
+                seg_land_hits.append((hit_lead, entry_dist, cat_name, macro))
+        else:
+            # Coarse fallback only when ph_provinces.json is missing
+            n_steps = max(2, int(math.ceil(seg_len / 0.25)))
+            for s in np.linspace(0.0, 1.0, n_steps):
+                px = x1 + s * (x2 - x1)
+                py = y1 + s * (y2 - y1)
+                hit_lead = h1 + s * (h2 - h1)
+                if 18.8 <= py <= 25.5 and 119.8 <= px <= 122.4:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · TAIWAN / LUZON STRAIT', 'TAIWAN_STRAIT'))
+                elif 16.5 <= py < 18.8 and 120.4 <= px <= 122.4:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · CAGAYAN / ISABELA / N. LUZON', 'LUZON'))
+                elif 14.3 <= py < 16.5 and 121.3 <= px <= 122.4:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · AURORA / QUEZON / POLILLO', 'LUZON'))
+                elif 12.3 <= py < 14.3 and 122.5 <= px <= 124.5:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · BICOL REGION / CATANDUANES', 'LUZON'))
+                elif 14.3 <= py < 16.5 and 119.8 <= px < 121.3:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · CENTRAL LUZON / W. LUZON', 'LUZON'))
+                elif 12.2 <= py < 14.3 and 120.2 <= px < 122.5:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · S. LUZON / MINDORO / MIMAROPA', 'LUZON'))
+                elif 9.8 <= py < 12.5 and 124.0 <= px <= 125.9:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · EASTERN SAMAR / LEYTE', 'VISAYAS'))
+                elif 9.0 <= py < 12.0 and 121.9 <= px < 124.0:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · CENTRAL / WESTERN VISAYAS', 'VISAYAS'))
+                elif 8.5 <= py < 10.5 and 125.0 <= px <= 126.5:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · DINAGAT / SIARGAO / SURIGAO', 'MINDANAO'))
+                elif 5.2 <= py < 8.5 and 121.8 <= px <= 126.6:
+                    seg_land_hits.append((hit_lead, s * seg_len, 'LANDFALL · DAVAO / CENTRAL MINDANAO', 'MINDANAO'))
+
+        if seg.intersects(taiwan_poly):
+            inter_tw = seg.intersection(taiwan_poly)
+            if not inter_tw.is_empty:
+                entry_dist = p_start.distance(inter_tw)
+                frac = (entry_dist / seg_len) if seg_len > 0 else 0.0
+                seg_land_hits.append((h1 + frac * (h2 - h1), entry_dist, 'LANDFALL · TAIWAN / LUZON STRAIT', 'TAIWAN_STRAIT'))
+
+        seg_land_hits.sort(key=lambda item: (item[0], item[1]))
+        for hl, _, cname, macro in seg_land_hits:
+            land_hits.append((hl, cname, macro))
+
+        if seg.intersects(strait_corridor):
+            inter_st = seg.intersection(strait_corridor)
+            if not inter_st.is_empty:
+                entry_dist = p_start.distance(inter_st)
+                frac = (entry_dist / seg_len) if seg_len > 0 else 0.0
+                strait_hits.append((h1 + frac * (h2 - h1), 'LANDFALL · TAIWAN / LUZON STRAIT', 'TAIWAN_STRAIT'))
+
+    return land_hits, strait_hits
+
+
+def _is_hainan_or_guangdong(lat, lon):
+    """Distinguishes Hainan/Guangdong/Hong Kong coast from Vietnam coast."""
+    return (lat >= 18.5 and lon >= 108.5) or (lat >= 18.0 and lon >= 111.0)
+
+
+def _track_hits_ph(t_df):
+    """Returns True if track intersects any Philippine province polygon."""
+    clean = t_df.dropna(subset=['lat', 'lon', 'lead_time_hours']).sort_values('lead_time_hours')
+    if len(clean) < 2:
+        return False
+    lon_u = _unwrap_wnp_lons(clean['lon'].values)
+    lats = clean['lat'].values.astype(float)
+    leads = clean['lead_time_hours'].values.astype(float)
+    land_hits, _ = _find_chronological_hits(lon_u, lats, leads)
+    return any(macro in ('LUZON', 'VISAYAS', 'MINDANAO', 'PALAWAN') for _, _, macro in land_hits) or any(
+        19.8 <= lat <= 21.0 and 121.6 <= lon <= 122.2
+        for lon, lat in zip(lon_u, lats)
+    )
+
+
 def classify_ensemble_track(t_df):
     """
     Classifies an individual ensemble member track into a meteorologically meaningful,
     geographically precise scenario covering the Western North Pacific, PAR, and South China Sea:
-      - Luzon Landfalls & Passages:
-        * LANDFALL · BICOL REGION / CATANDUANES (Catanduanes, Albay, Sorsogon, Camarines Sur/Norte)
-        * LANDFALL · AURORA / QUEZON / POLILLO (Aurora, Northern/Southern Quezon, Polillo Islands)
-        * LANDFALL · CAGAYAN / ISABELA / N. LUZON (Cagayan, Isabela, Northern Luzon)
-        * LANDFALL · TAIWAN / LUZON STRAIT (Batanes, Babuyan Islands, Taiwan, Bashi Channel)
-        * LANDFALL · CENTRAL LUZON / W. LUZON (Pangasinan, Zambales, Bataan, Metro Manila, Cavite)
-        * LANDFALL · S. TAGALOG / MINDORO / MIMAROPA (Batangas, Mindoro, Marinduque, Romblon)
-        * CROSSES LUZON · SOUTH CHINA SEA (crosses Luzon landmass into West Philippine Sea / SCS)
-        * CROSSES LUZON · HAINAN / GUANGDONG (crosses Luzon continuing toward Hainan / Guangdong)
-        * CROSSES LUZON · VIETNAM (crosses Luzon continuing toward Vietnam)
-      - Visayas Landfalls & Passages:
-        * LANDFALL · EASTERN SAMAR / LEYTE (Eastern Samar, Northern Samar, Samar, Leyte, Biliran)
-        * LANDFALL · CENTRAL / WESTERN VISAYAS (Cebu, Bohol, Negros, Panay, Guimaras, Siquijor)
-        * CROSSES VISAYAS · SULU SEA / SCS (crosses Visayas into Sulu Sea / South China Sea)
-      - Mindanao Landfalls & Passages:
-        * LANDFALL · DINAGAT / SIARGAO / SURIGAO (Dinagat Islands, Siargao, Surigao del Norte/Sur)
-        * LANDFALL · DAVAO / CENTRAL MINDANAO (Davao, Bukidnon, Misamis, Cotabato, Sarangani, Zamboanga)
-        * CROSSES MINDANAO · SULU SEA (crosses Mindanao into Sulu Sea / Celebes Sea)
-      - Recurvature Trajectories:
-        * RECURVE · EAST OF TAIWAN / RYUKYU (curves north near Taiwan / Ryukyu / Miyako / Okinawa)
-        * RECURVE · S. JAPAN / OPEN PACIFIC (curves north/northeast east of 128°E into open Pacific / Japan)
-        * RECURVE · PHILIPPINE SEA (curves north in central Philippine Sea, staying offshore of PH)
-      - West of Philippines & South China Sea Passages:
-        * PASSES WEST OF LUZON · W. PHILIPPINE SEA (tracks northward offshore west of Ilocos/Zambales)
-        * RECURVE · WEST OF LUZON / SCS (recurves north/northeast over SCS toward Taiwan / Luzon Strait)
-        * PASSES PALAWAN · SULU SEA / SCS (tracks near Palawan / Sulu Sea)
-        * WESTWARD · HAINAN / GUANGDONG (direct entry into SCS toward Hainan / Guangdong / Hong Kong)
-        * WESTWARD · VIETNAM / S. CHINA SEA (tracks across SCS toward Vietnam)
-        * WESTWARD · S. CHINA SEA / SPRATLYS (tracks across central/southern SCS near Spratlys)
-      - Offshore / Dissipation:
-        * OFFSHORE · EAST OF PHILIPPINES (stays offshore east of the archipelago)
-        * DISSIPATION · PHILIPPINE SEA (weakens/dissipates offshore over open waters)
+      - Uses segment-based Shapely polygon intersections against Philippine provinces & Taiwan
+        (eliminating false offshore landfalls, 6h/12h box-skipping, and unreachable SCS categories).
+      - Unwraps longitudes across the 180° antimeridian and preserves chronological event order.
     """
-    t_df = t_df.sort_values('lead_time_hours')
-    min_lon = float(t_df['lon'].min())
-    max_lat = float(t_df['lat'].max())
-    first_lat = float(t_df.iloc[0]['lat'])
-    last_lat = float(t_df.iloc[-1]['lat'])
-    last_lon = float(t_df.iloc[-1]['lon'])
+    clean_df = t_df.dropna(subset=['lat', 'lon', 'lead_time_hours']).sort_values('lead_time_hours').reset_index(drop=True)
+    if len(clean_df) < 2:
+        return 'DISSIPATION · PHILIPPINE SEA'
 
-    min_lon_idx = t_df['lon'].idxmin()
-    lat_at_min_lon = float(t_df.loc[min_lon_idx, 'lat'])
+    lon_u = _unwrap_wnp_lons(clean_df['lon'].values)
+    lats = clean_df['lat'].values.astype(float)
+    leads = clean_df['lead_time_hours'].values.astype(float)
+
+    min_lon = float(np.min(lon_u))
+    max_lat = float(np.max(lats))
+    first_lat = float(lats[0])
+    first_lon = float(lon_u[0])
+    last_lat = float(lats[-1])
+    last_lon = float(lon_u[-1])
+
+    min_lon_pos = int(np.argmin(lon_u))
+    lat_at_min_lon = float(lats[min_lon_pos])
     delta_lon_turn = last_lon - min_lon
+    delta_lat_turn = last_lat - lat_at_min_lon
 
-    # Check landfall/approach coordinates across Philippine regional domains:
-    # 1. Bicol / Catanduanes: lat 12.3 to 14.4, lon 122.5 to 125.0
-    bicol_pts = t_df[(t_df['lat'] >= 12.3) & (t_df['lat'] < 14.4) & (t_df['lon'] >= 122.5) & (t_df['lon'] <= 125.0)]
-    # 2. Aurora / Quezon / Polillo: lat 14.4 to 16.5, lon 121.3 to 123.5
-    aurora_pts = t_df[(t_df['lat'] >= 14.4) & (t_df['lat'] < 16.5) & (t_df['lon'] >= 121.3) & (t_df['lon'] <= 123.5)]
-    # 3. Cagayan / Isabela / N. Luzon: lat 16.5 to 18.8, lon 121.2 to 123.5
-    nluzon_pts = t_df[(t_df['lat'] >= 16.5) & (t_df['lat'] < 18.8) & (t_df['lon'] >= 121.2) & (t_df['lon'] <= 123.5)]
-    # 4. Taiwan / Luzon Strait (Babuyan, Batanes, Taiwan, Bashi Channel): lat 18.8 to 25.5, lon 119.5 to 124.0
-    taiwan_strait_pts = t_df[(t_df['lat'] >= 18.8) & (t_df['lat'] <= 25.5) & (t_df['lon'] >= 119.5) & (t_df['lon'] <= 124.0)]
-    # 5. Central Luzon / Western Luzon: lat 14.5 to 18.5, lon 119.5 to 121.2
-    wluzon_pts = t_df[(t_df['lat'] >= 14.5) & (t_df['lat'] < 18.5) & (t_df['lon'] >= 119.5) & (t_df['lon'] <= 121.2)]
-    # 6. Southern Tagalog / Mindoro / MIMAROPA: lat 12.0 to 14.5, lon 120.0 to 122.3
-    mimaropa_pts = t_df[(t_df['lat'] >= 12.0) & (t_df['lat'] < 14.5) & (t_df['lon'] >= 120.0) & (t_df['lon'] <= 122.3)]
-    # 7. Eastern Samar / Leyte (Eastern Visayas): lat 9.8 to 12.5, lon 124.0 to 126.5
-    evisayas_pts = t_df[(t_df['lat'] >= 9.8) & (t_df['lat'] < 12.5) & (t_df['lon'] >= 124.0) & (t_df['lon'] <= 126.5)]
-    # 8. Central & Western Visayas: lat 9.0 to 12.0, lon 122.0 to 124.2
-    wvisayas_pts = t_df[(t_df['lat'] >= 9.0) & (t_df['lat'] < 12.0) & (t_df['lon'] >= 122.0) & (t_df['lon'] <= 124.2)]
-    # 9. Dinagat / Siargao / Surigao (NE Mindanao / Caraga): lat 8.5 to 10.5, lon 125.0 to 126.8
-    caraga_pts = t_df[(t_df['lat'] >= 8.5) & (t_df['lat'] < 10.5) & (t_df['lon'] >= 125.0) & (t_df['lon'] <= 126.8)]
-    # 10. Davao / Central / Southern Mindanao: lat 5.0 to 8.5, lon 121.5 to 126.8
-    smindanao_pts = t_df[(t_df['lat'] >= 5.0) & (t_df['lat'] < 8.5) & (t_df['lon'] >= 121.5) & (t_df['lon'] <= 126.8)]
-
-    # Check for entry into South China Sea / West Philippine Sea (lon <= 119.5):
-    into_scs = t_df[t_df['lon'] <= 119.5]
+    land_hits, strait_hits = _find_chronological_hits(lon_u, lats, leads)
 
     # ─────────────────────────────────────────────────────────────
-    # A. RECURVING TRACKS (Turning North/Northeast into Pacific)
+    # A. DIRECT LANDFALL & ARCHIPELAGO CROSSINGS (POLYGONS FIRST)
     # ─────────────────────────────────────────────────────────────
-    # 1. Open Pacific / South Japan: min_lon >= 128.5 and recurves north/northeast
-    if min_lon >= 128.5 and (last_lat >= 23.0 or max_lat >= 25.0 or delta_lon_turn >= 1.5):
-        return 'RECURVE · S. JAPAN / OPEN PACIFIC'
+    if land_hits:
+        first_hit_lead, first_cat, first_macro = land_hits[0]
+        # Prefer first Philippine landmass hit if the track hit PH/Luzon/Visayas/Mindanao after Batanes/Taiwan
+        ph_only_hits = [h for h in land_hits if h[2] in ('LUZON', 'VISAYAS', 'MINDANAO', 'PALAWAN')]
+        if first_macro == 'TAIWAN_STRAIT' and ph_only_hits:
+            # If a storm grazed Batanes/Babuyan briefly then hit Luzon, classify by Luzon landfall if close in time
+            if ph_only_hits[0][0] - first_hit_lead <= 24.0:
+                first_hit_lead, first_cat, first_macro = ph_only_hits[0]
 
-    # 2. Recurve East of Taiwan / Ryukyu (curves north near Taiwan/Ryukyu 121.5°E - 128.5°E, lat >= 18.5°N)
-    if 121.5 <= min_lon <= 128.5 and (delta_lon_turn >= 1.5 or last_lat >= 23.5) and lat_at_min_lon >= 18.5:
-        if min_lon >= 126.5 and last_lat >= 25.0:
-            return 'RECURVE · S. JAPAN / OPEN PACIFIC'
-        return 'RECURVE · EAST OF TAIWAN / RYUKYU'
+        post_mask = leads >= first_hit_lead
+        post_lons = lon_u[post_mask]
+        post_lats = lats[post_mask]
+        post_min_lon = float(np.min(post_lons)) if len(post_lons) else last_lon
 
-    # 3. Recurve in Philippine Sea (lat < 18.5, but curves north/northeast offshore east of 126.5°E)
-    if min_lon >= 126.5 and (delta_lon_turn >= 2.0 or last_lat >= 23.0):
-        return 'RECURVE · PHILIPPINE SEA'
-
-    # ─────────────────────────────────────────────────────────────
-    # B. TRACKS CROSSING LUZON OR VISAYAS INTO SOUTH CHINA SEA
-    # ─────────────────────────────────────────────────────────────
-    if not into_scs.empty:
-        # Came from Luzon landfall:
-        if not (nluzon_pts.empty and aurora_pts.empty and bicol_pts.empty):
-            scs_end_lat = float(into_scs.iloc[-1]['lat'])
-            scs_end_lon = float(into_scs.iloc[-1]['lon'])
-            if scs_end_lon <= 111.0:
-                return 'CROSSES LUZON · VIETNAM'
-            elif scs_end_lat >= 19.0:
-                return 'CROSSES LUZON · HAINAN / GUANGDONG'
-            else:
+        if first_macro == 'LUZON':
+            post_scs_mask = post_lons <= 119.5
+            if np.any(post_scs_mask) and post_min_lon <= 119.3:
+                scs_end_lat = float(post_lats[post_scs_mask][-1])
+                scs_end_lon = float(post_lons[post_scs_mask][-1])
+                if _is_hainan_or_guangdong(scs_end_lat, scs_end_lon):
+                    return 'CROSSES LUZON · HAINAN / GUANGDONG'
+                if scs_end_lon <= 111.5:
+                    return 'CROSSES LUZON · VIETNAM'
                 return 'CROSSES LUZON · SOUTH CHINA SEA'
-        elif not evisayas_pts.empty or not wvisayas_pts.empty:
-            return 'CROSSES VISAYAS · SULU SEA / SCS'
-        elif not caraga_pts.empty or not smindanao_pts.empty:
-            return 'CROSSES MINDANAO · SULU SEA'
+            return first_cat
 
-    # ─────────────────────────────────────────────────────────────
-    # C. DIRECT REGIONAL LANDFALL & PASSAGE CATEGORIES
-    # ─────────────────────────────────────────────────────────────
-    # 1. Taiwan / Luzon Strait / Batanes / Babuyan
-    if not taiwan_strait_pts.empty or (lat_at_min_lon >= 18.8 and min_lon <= 123.0):
-        if min_lon <= 113.5 and last_lat <= 22.5:
+        if first_macro == 'VISAYAS':
+            if post_min_lon <= 121.0:
+                return 'CROSSES VISAYAS · SULU SEA / SCS'
+            return first_cat
+
+        if first_macro == 'MINDANAO':
+            if post_min_lon <= 122.0:
+                return 'CROSSES MINDANAO · SULU SEA'
+            return first_cat
+
+        if first_macro == 'PALAWAN':
+            return 'PASSES PALAWAN · SULU SEA / SCS'
+
+        if first_macro == 'TAIWAN_STRAIT':
+            return 'LANDFALL · TAIWAN / LUZON STRAIT'
+
+    # Luzon Strait water passage (Bashi / Balintang Channel without touching PH/Taiwan land)
+    if strait_hits:
+        st_lead = strait_hits[0][0]
+        post_mask = leads >= st_lead
+        post_lons = lon_u[post_mask]
+        post_lats = lats[post_mask]
+        post_min_lon = float(np.min(post_lons)) if len(post_lons) else last_lon
+
+        # Originated in SCS and recurved northeast through Luzon Strait
+        if first_lon <= 119.5 and delta_lon_turn >= 1.5 and last_lat >= 19.0:
+            return 'RECURVE · WPS / SCS'
+        # Passed cleanly through Luzon Strait westward into China / Hainan / Vietnam
+        if post_min_lon <= 116.5:
+            if _is_hainan_or_guangdong(last_lat, last_lon):
+                return 'WESTWARD · HAINAN / GUANGDONG'
+            if last_lon <= 111.5:
+                return 'WESTWARD · VIETNAM / S. CHINA SEA'
             return 'WESTWARD · HAINAN / GUANGDONG'
         return 'LANDFALL · TAIWAN / LUZON STRAIT'
 
-    # 2. Northern Luzon (Cagayan / Isabela)
-    if not nluzon_pts.empty or (16.5 <= lat_at_min_lon < 18.8 and min_lon <= 123.5):
-        return 'LANDFALL · CAGAYAN / ISABELA / N. LUZON'
+    # ─────────────────────────────────────────────────────────────
+    # B. OFFSHORE RECURVATURE (NO PH / TAIWAN LANDFALL)
+    # ─────────────────────────────────────────────────────────────
+    is_recurve = (
+        (delta_lon_turn >= 1.5 and last_lat >= 20.0 and delta_lat_turn >= 2.0)
+        or (last_lat >= 23.0 and (last_lat - first_lat) >= 5.0 and min_lon >= 120.5)
+    )
+    if min_lon >= 128.5 and is_recurve:
+        return 'RECURVE · S. JAPAN / OPEN PACIFIC'
 
-    # 3. Central Eastern Luzon (Aurora / Quezon / Polillo)
-    if not aurora_pts.empty or (14.4 <= lat_at_min_lon < 16.5 and min_lon <= 123.5):
-        return 'LANDFALL · AURORA / QUEZON / POLILLO'
+    if 120.5 <= min_lon < 128.5 and is_recurve:
+        if min_lon >= 126.5 and last_lat >= 25.0:
+            return 'RECURVE · S. JAPAN / OPEN PACIFIC'
+        if lat_at_min_lon >= 18.5 or max_lat >= 24.0:
+            return 'RECURVE · EAST OF TAIWAN / RYUKYU'
+        return 'RECURVE · PHILIPPINE SEA'
 
-    # 4. Bicol Region / Catanduanes
-    if not bicol_pts.empty or (12.3 <= lat_at_min_lon < 14.4 and min_lon <= 125.0):
-        return 'LANDFALL · BICOL REGION / CATANDUANES'
-
-    # 5. Southern Tagalog / Mindoro / Northern MIMAROPA
-    if not mimaropa_pts.empty or (12.0 <= lat_at_min_lon < 14.5 and min_lon <= 122.3):
-        return 'LANDFALL · S. LUZON / MINDORO / MIMAROPA'
-
-    # 6. Central & Western Luzon
-    if not wluzon_pts.empty:
-        return 'LANDFALL · CENTRAL LUZON / W. LUZON'
-
-    # 7. Eastern Visayas (Samar / Leyte)
-    if not evisayas_pts.empty or (9.8 <= lat_at_min_lon < 12.3 and min_lon <= 126.5):
-        return 'LANDFALL · EASTERN SAMAR / LEYTE'
-
-    # 8. Central & Western Visayas (Cebu / Panay / Negros / Bohol)
-    if not wvisayas_pts.empty or (9.0 <= lat_at_min_lon < 12.0 and min_lon <= 124.0):
-        return 'LANDFALL · CENTRAL / WESTERN VISAYAS'
-
-    # 9. Dinagat / Siargao / Surigao (Caraga / NE Mindanao)
-    if not caraga_pts.empty or (8.5 <= lat_at_min_lon < 9.8 and min_lon <= 126.8):
-        return 'LANDFALL · DINAGAT / SIARGAO / SURIGAO'
-
-    # 10. Southern / Central Mindanao (Davao / Cotabato / Zamboanga)
-    if not smindanao_pts.empty or (lat_at_min_lon < 8.5 and min_lon <= 127.0):
-        return 'LANDFALL · DAVAO / CENTRAL MINDANAO'
-
-    # 11. Scenarios for Storms West of the Philippines (West Philippine Sea / South China Sea)
-    if not into_scs.empty or min_lon <= 120.0:
-        scs_end_lat = float(into_scs.iloc[-1]['lat']) if not into_scs.empty else lat_at_min_lon
-        scs_end_lon = float(into_scs.iloc[-1]['lon']) if not into_scs.empty else min_lon
-
-        # A) Recurvature in South China Sea / West of Luzon (turns north/northeast toward Taiwan or Luzon Strait)
-        if min_lon <= 119.5 and delta_lon_turn >= 1.5 and last_lat >= 19.5:
+    # ─────────────────────────────────────────────────────────────
+    # C. SOUTH CHINA SEA / WEST PHILIPPINE SEA SCENARIOS
+    # ─────────────────────────────────────────────────────────────
+    if min_lon <= 120.5:
+        # 1) Recurvature in South China Sea / West of Luzon
+        if delta_lon_turn >= 1.5 and last_lat >= 19.0 and delta_lat_turn >= 2.0:
             return 'RECURVE · WPS / SCS'
 
-        # B) Passes West of Luzon offshore (tracks northward in West Philippine Sea without hitting land)
-        if 116.5 <= min_lon <= 120.2 and 14.5 <= lat_at_min_lon <= 19.5 and last_lat >= 19.0 and delta_lon_turn < 1.5:
+        # 2) Passes West of Luzon offshore (tracks northward in WPS without hitting Luzon)
+        if (
+            116.0 <= min_lon <= 120.5
+            and float(np.max(lon_u)) <= 121.0
+            and 11.5 <= lat_at_min_lon <= 20.5
+            and last_lat >= 18.5
+            and (last_lat - first_lat) >= 3.0
+            and delta_lon_turn < 1.5
+        ):
             return 'PASSES WEST OF LUZON · W. PHILIPPINE SEA'
 
-        # C) Passes Palawan or Sulu Sea
-        if 7.0 <= lat_at_min_lon <= 12.0 and min_lon <= 119.8:
+        # 3) Passes near Palawan / Sulu Sea offshore
+        if 7.0 <= lat_at_min_lon <= 12.0 and 117.0 <= min_lon <= 122.0 and first_lon >= 118.0:
             return 'PASSES PALAWAN · SULU SEA / SCS'
 
-        # D) Westward toward Vietnam
-        if scs_end_lon <= 111.5:
-            return 'WESTWARD · VIETNAM / S. CHINA SEA'
-
-        # E) Westward toward Hainan Island / Guangdong / Hong Kong
-        if scs_end_lat >= 18.0:
+        # 4) Westward toward Hainan Island / Guangdong / Hong Kong
+        if _is_hainan_or_guangdong(last_lat, last_lon):
             return 'WESTWARD · HAINAN / GUANGDONG'
 
-        # F) Central South China Sea / Spratlys
+        # 5) Westward toward Vietnam
+        if last_lon <= 111.5:
+            return 'WESTWARD · VIETNAM / S. CHINA SEA'
+
+        # 6) Central South China Sea / Spratlys
         return 'WESTWARD · S. CHINA SEA / SPRATLYS'
 
     # ─────────────────────────────────────────────────────────────
-    # D. OFFSHORE APPROACH & DISSIPATION
+    # D. OFFSHORE APPROACH & DISSIPATION (EAST OF PHILIPPINES)
     # ─────────────────────────────────────────────────────────────
-    if last_lat >= 23.0 or max_lat >= 24.5:
+    if last_lat >= 23.0 and (last_lat - first_lat) >= 5.0:
         return 'RECURVE · S. JAPAN / OPEN PACIFIC'
     if min_lon <= 127.0:
         return 'OFFSHORE · EAST OF PHILIPPINES'
     return 'DISSIPATION · PHILIPPINE SEA'
 
 
+_CORRIDOR_ROLLUP_MAP = {
+    'LANDFALL · CAGAYAN / ISABELA / N. LUZON': 'LANDFALL / CROSSES LUZON',
+    'LANDFALL · AURORA / QUEZON / POLILLO': 'LANDFALL / CROSSES LUZON',
+    'LANDFALL · CENTRAL LUZON / W. LUZON': 'LANDFALL / CROSSES LUZON',
+    'LANDFALL · BICOL REGION / CATANDUANES': 'LANDFALL / CROSSES LUZON',
+    'LANDFALL · S. LUZON / MINDORO / MIMAROPA': 'LANDFALL / CROSSES LUZON',
+    'CROSSES LUZON · SOUTH CHINA SEA': 'LANDFALL / CROSSES LUZON',
+    'CROSSES LUZON · HAINAN / GUANGDONG': 'LANDFALL / CROSSES LUZON',
+    'CROSSES LUZON · VIETNAM': 'LANDFALL / CROSSES LUZON',
+    'LANDFALL · EASTERN SAMAR / LEYTE': 'LANDFALL / CROSSES VISAYAS',
+    'LANDFALL · CENTRAL / WESTERN VISAYAS': 'LANDFALL / CROSSES VISAYAS',
+    'CROSSES VISAYAS · SULU SEA / SCS': 'LANDFALL / CROSSES VISAYAS',
+    'LANDFALL · DINAGAT / SIARGAO / SURIGAO': 'LANDFALL / CROSSES MINDANAO',
+    'LANDFALL · DAVAO / CENTRAL MINDANAO': 'LANDFALL / CROSSES MINDANAO',
+    'CROSSES MINDANAO · SULU SEA': 'LANDFALL / CROSSES MINDANAO',
+    'WESTWARD · VIETNAM / S. CHINA SEA': 'WESTWARD · SOUTH CHINA SEA',
+    'WESTWARD · HAINAN / GUANGDONG': 'WESTWARD · SOUTH CHINA SEA',
+    'WESTWARD · S. CHINA SEA / SPRATLYS': 'WESTWARD · SOUTH CHINA SEA',
+    'RECURVE · S. JAPAN / OPEN PACIFIC': 'RECURVE · OFFSHORE PACIFIC',
+    'RECURVE · EAST OF TAIWAN / RYUKYU': 'RECURVE · OFFSHORE PACIFIC',
+    'RECURVE · PHILIPPINE SEA': 'RECURVE · OFFSHORE PACIFIC',
+}
+
+
+def _consolidate_fragmented_tracks(grouped_tracks, total_tracked, min_pct=10.0):
+    """
+    Hierarchical rollup: preserves any scenario already >= min_pct with its exact regional label,
+    while consolidating sub-threshold (< min_pct) sibling tracks in the same meteorological corridor
+    when their combined share reaches >= min_pct (preventing normal spread across Luzon/Visayas
+    sub-regions from being dropped by the 10% display cutoff).
+    """
+    consolidated = {}
+    sub_buckets = {}
+
+    for cat_name, c_tracks in grouped_tracks.items():
+        pct = (len(c_tracks) / total_tracked) * 100.0
+        if pct >= min_pct:
+            consolidated[cat_name] = list(c_tracks)
+        else:
+            parent = _CORRIDOR_ROLLUP_MAP.get(cat_name, cat_name)
+            sub_buckets.setdefault(parent, []).extend(c_tracks)
+
+    for parent, tracks in sub_buckets.items():
+        if parent in consolidated:
+            consolidated[parent].extend(tracks)
+        else:
+            consolidated[parent] = tracks
+
+    return consolidated
+
+
+def _compute_scenario_mean_df(c_tracks, max_lead_hours):
+    """Computes scenario mean trajectory (with unwrapped WNP longitudes) and median winds."""
+    count = len(c_tracks)
+    all_leads = sorted({
+        float(h) for t in c_tracks for h in t['df']['lead_time_hours'] if h <= max_lead_hours
+    })
+    if not all_leads:
+        return pd.DataFrame()
+
+    min_surviving = min(count, max(2, int(round(count * 0.30))))
+    if count == 1:
+        min_surviving = 1
+
+    # Precompute unwrapped longitudes & start/end leads per member
+    prepared = []
+    for t in c_tracks:
+        tdf = t['df'].dropna(subset=['lat', 'lon', 'lead_time_hours']).sort_values('lead_time_hours')
+        if len(tdf) < 2:
+            continue
+        t_leads = tdf['lead_time_hours'].values.astype(float)
+        t_lats = tdf['lat'].values.astype(float)
+        t_lons = _unwrap_wnp_lons(tdf['lon'].values)
+        wind_col = (
+            'maximum_sustained_wind_speed_knots'
+            if 'maximum_sustained_wind_speed_knots' in tdf.columns
+            else ('wind' if 'wind' in tdf.columns else None)
+        )
+        t_winds = tdf[wind_col].values.astype(float) if wind_col else None
+        prepared.append({
+            'min_lead': float(t_leads[0]),
+            'max_lead': float(t_leads[-1]),
+            'leads': t_leads,
+            'lats': t_lats,
+            'lons': t_lons,
+            'winds': t_winds,
+        })
+
+    if not prepared:
+        return pd.DataFrame()
+
+    # Wait until enough members exist (handles staggered genesis), then stop when survivors drop
+    started = False
+    mean_pts = []
+    for lead in all_leads:
+        active_mems = [m for m in prepared if m['min_lead'] <= lead <= m['max_lead']]
+        if len(active_mems) < min_surviving:
+            if started:
+                break
+            continue
+        started = True
+
+        l_lats = [float(np.interp(lead, m['leads'], m['lats'])) for m in active_mems]
+        l_lons = [float(np.interp(lead, m['leads'], m['lons'])) for m in active_mems]
+        l_winds = []
+        for m in active_mems:
+            if m['winds'] is not None:
+                valid_w = ~np.isnan(m['winds'])
+                if np.any(valid_w):
+                    l_winds.append(float(np.interp(lead, m['leads'][valid_w], m['winds'][valid_w])))
+
+        if l_lats and l_lons:
+            mean_pts.append({
+                'lead': lead,
+                'lat': float(np.mean(l_lats)),
+                'lon': float(np.mean(l_lons)),
+                'wind': float(np.nanmedian(l_winds)) if l_winds else np.nan
+            })
+
+    return pd.DataFrame(mean_pts)
+
+
 def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
     """
     Dynamically categorizes ensemble member tracks across all potential scenarios,
-    and isolates strictly the top 3 most probable scenarios for display.
+    consolidates fragmented sub-threshold corridors, and isolates up to the top 3 scenarios.
     """
     from collections import defaultdict
 
     track_list = []
     for (tid, sid), t_df in df_storm.groupby(['track_id', 'sample']):
-        t_df = t_df[t_df['lead_time_hours'] <= max_lead_hours].sort_values('lead_time_hours')
+        t_df = (
+            t_df[t_df['lead_time_hours'] <= max_lead_hours]
+            .dropna(subset=['lat', 'lon', 'lead_time_hours'])
+            .sort_values('lead_time_hours')
+            .reset_index(drop=True)
+        )
         if len(t_df) < 2:
             continue
 
@@ -488,9 +959,11 @@ def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
         return []
 
     total_tracked = len(track_list)
-    grouped_tracks = defaultdict(list)
+    raw_grouped = defaultdict(list)
     for t in track_list:
-        grouped_tracks[t['category']].append(t)
+        raw_grouped[t['category']].append(t)
+
+    grouped_tracks = _consolidate_fragmented_tracks(raw_grouped, total_tracked, min_pct=10.0)
 
     raw_clusters = []
     for cat_name, c_tracks in grouped_tracks.items():
@@ -499,40 +972,20 @@ def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
         count = len(c_tracks)
         pct = (count / total_tracked) * 100.0
 
-        # Mean track computation up to max_lead_hours (+318h full run)
-        # End track when surviving members fall below 30% of the scenario
-        all_leads = sorted([h for h in set(h for t in c_tracks for h in t['df']['lead_time_hours']) if h <= max_lead_hours])
-        min_surviving = max(4, int(round(count * 0.30)))
-        mean_pts = []
-        for lead in all_leads:
-            active_mems = [t for t in c_tracks if lead <= t['df']['lead_time_hours'].max()]
-            if len(active_mems) < min_surviving:
-                break
-            l_lats = [float(np.interp(lead, t['df']['lead_time_hours'], t['df']['lat'])) for t in active_mems]
-            l_lons = [float(np.interp(lead, t['df']['lead_time_hours'], t['df']['lon'])) for t in active_mems]
-            l_winds = [float(np.interp(lead, t['df']['lead_time_hours'], t['df']['maximum_sustained_wind_speed_knots']))
-                       for t in active_mems if 'maximum_sustained_wind_speed_knots' in t['df']]
-            if l_lats and l_lons:
-                mean_pts.append({
-                    'lead': lead,
-                    'lat': float(np.mean(l_lats)),
-                    'lon': float(np.mean(l_lons)),
-                    'wind': float(np.median(l_winds)) if l_winds else np.nan
-                })
+        mean_df = _compute_scenario_mean_df(c_tracks, max_lead_hours)
 
-        mean_df = pd.DataFrame(mean_pts)
-
-        all_peak_w = [t['df']['maximum_sustained_wind_speed_knots'].max()
-                      for t in c_tracks if 'maximum_sustained_wind_speed_knots' in t['df']]
+        all_peak_w = []
+        for t in c_tracks:
+            w_col = (
+                'maximum_sustained_wind_speed_knots'
+                if 'maximum_sustained_wind_speed_knots' in t['df'].columns
+                else ('wind' if 'wind' in t['df'].columns else None)
+            )
+            if w_col and not t['df'][w_col].dropna().empty:
+                all_peak_w.append(float(t['df'][w_col].max()))
         peak_median_kt = int(round(np.nanmedian(all_peak_w))) if all_peak_w else 95
 
-        # Landfall count in Philippines (lon 118-127, lat 5-21)
-        ph_landfall_count = 0
-        for t in c_tracks:
-            in_ph = ((t['df']['lat'] >= 5.0) & (t['df']['lat'] <= 21.0) &
-                     (t['df']['lon'] >= 118.0) & (t['df']['lon'] <= 126.5)).any()
-            if in_ph:
-                ph_landfall_count += 1
+        ph_landfall_count = sum(1 for t in c_tracks if _track_hits_ph(t['df']))
         ph_landfall_pct = int(round((ph_landfall_count / count) * 100))
 
         raw_clusters.append({
@@ -545,11 +998,9 @@ def cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=318):
             'ph_landfall_pct': ph_landfall_pct
         })
 
-    # Filter out any scenario with lower than 10% probability (< 10.0%) as requested:
-    # "when it has 10% lower dont display"
+    # Filter out any scenario with lower than 10% probability (< 10.0%) as requested
     significant_clusters = [c for c in raw_clusters if c['pct'] >= 10.0]
     if not significant_clusters:
-        # Fallback to dominant scenario if all raw clusters are under 10%
         significant_clusters = [max(raw_clusters, key=lambda c: c['count'])]
 
     # Sort descending by member count
@@ -617,6 +1068,9 @@ def render_storm_outlook(
 
     # Cluster scenarios up to full run (max_lead_hours)
     scenarios = cluster_track_scenarios(df_storm, n_clusters=3, max_lead_hours=max_lead_hours)
+    if not scenarios:
+        print("Warning: No valid multi-point track scenarios to render.")
+        return
     tracked_members = len(df_storm.groupby(['track_id', 'sample']))
 
     # Setup 16:9 widescreen canvas
@@ -731,7 +1185,7 @@ def render_storm_outlook(
         # 1. Faint individual member tracks
         for t in sc['tracks']:
             t_df = t['df'][t['df']['lead_time_hours'] <= max_lead_hours].sort_values('lead_time_hours')
-            lons = t_df['lon'].values
+            lons = _unwrap_wnp_lons(t_df['lon'].values)
             lats = t_df['lat'].values
             if len(lons) < 2:
                 continue
@@ -927,8 +1381,15 @@ def render_storm_outlook(
         bar_fill_len = 0.77 * (sc['pct'] / 100.0)
         ax_hud.barh(bar_bg_y, bar_fill_len, height=bar_h, left=0.17, color=sc_col, align='center')
 
-    # Set Map Extents & Border Spines
-    ax_map.set_extent([110.0, 170.0, 4.0, 42.0], crs=ccrs.PlateCarree())
+    # Set Dynamic Map Extents (expand westward if tracks enter western South China Sea / Vietnam)
+    all_lons = []
+    for sc in scenarios:
+        for t in sc['tracks']:
+            all_lons.extend(_unwrap_wnp_lons(t['df']['lon'].dropna().values).tolist())
+    min_lon_ext = 110.0
+    if all_lons and min(all_lons) < 112.0:
+        min_lon_ext = max(98.0, min(110.0, math.floor(min(all_lons) - 3.0)))
+    ax_map.set_extent([min_lon_ext, 170.0, 4.0, 42.0], crs=ccrs.PlateCarree())
     for spine in ax_map.spines.values():
         spine.set_edgecolor('#334155')
         spine.set_linewidth(1.3)
@@ -964,7 +1425,8 @@ def main():
         print(f"No tracks found for storm {args.storm}")
         sys.exit(1)
 
-    storm_name = f"INVEST {args.storm.upper()}" if '9' in args.storm else f"TC {args.storm.upper()}"
+    is_invest = bool(re.search(r'(?:^|\D)9\d(?:\D|$)', args.storm.upper()))
+    storm_name = f"INVEST {args.storm.upper()}" if is_invest else f"TC {args.storm.upper()}"
     if knack_storms:
         for s in knack_storms:
             if args.storm.upper() in str(s.get('atcf_id', '')).upper():
